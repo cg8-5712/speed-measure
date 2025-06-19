@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>速度监测图表</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            width: 800px;
+            height: 400px;
+            margin: 20px auto;
+        }
+        .debug-info {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .status {
+            text-align: center;
+            margin: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div id="status" class="status disconnected">WebSocket状态: 未连接</div>
+
+    <div class="chart-container">
+        <canvas id="velocityChart"></canvas>
+    </div>
+
+    <div class="debug-info" id="debugInfo">
+        <div><strong>调试信息:</strong></div>
+        <div>等待WebSocket连接...</div>
+    </div>
+
+    <script>
+        // 常量定义
+        const L = 3;  // 距离
+        const R1 = 3.5 / 100;  // 半径1 (0.035)
+        const R2 = 15;  // 半径2
+
+        console.log('常量值:', { L, R1, R2 });
+
+        // 调试信息显示函数
+        function addDebugInfo(message) {
+            const debugDiv = document.getElementById('debugInfo');
+            const time = new Date().toLocaleTimeString();
+            debugDiv.innerHTML += `<div>[${time}] ${message}</div>`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
+
+        // 更新状态显示
+        function updateStatus(message, isConnected) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = `WebSocket状态: ${message}`;
+            statusDiv.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+        }
+
+        // 初始化图表
+        const ctx = document.getElementById('velocityChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'V2 速度',
+                    data: [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.1,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '速度 (V2)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '时间'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                }
+            }
+        });
+
+        // 连接WebSocket
+        addDebugInfo('尝试连接WebSocket...');
+        const ws = new WebSocket('ws://127.0.0.1:8080');
+
+        ws.onopen = function() {
+            updateStatus('已连接', true);
+            addDebugInfo('WebSocket连接成功');
+        };
+
+        ws.onmessage = function(event) {
+            // 详细的调试信息
+            addDebugInfo(`接收到原始数据: "${event.data}" (类型: ${typeof event.data})`);
+
+            // 尝试解析数据
+            let t;
+            try {
+                // 先清理数据（去除空白字符）
+                const cleanData = event.data.toString().trim();
+                addDebugInfo(`清理后的数据: "${cleanData}"`);
+
+                // 解析JSON数据
+                const jsonData = JSON.parse(cleanData);
+                addDebugInfo(`解析的JSON对象: ${JSON.stringify(jsonData)}`);
+
+                // 提取data字段
+                if (!jsonData.data) {
+                    addDebugInfo(`❌ JSON对象中没有找到'data'字段`);
+                    return;
+                }
+
+                // 将data字段解析为浮点数
+                t = parseFloat(jsonData.data);
+                addDebugInfo(`解析结果: t = ${t} (类型: ${typeof t})`);
+                addDebugInfo(`来源: ${jsonData.from}, 时间戳: ${jsonData.timestamp}`);
+
+                // 检查是否为有效数字
+                if (isNaN(t) || !isFinite(t)) {
+                    addDebugInfo(`❌ 解析失败: t 不是有效数字`);
+                    return;
+                }
+
+                // 检查是否为正数（时间不能为负数或零）
+                if (t <= 0) {
+                    addDebugInfo(`❌ 无效数据: t 必须大于0，当前值: ${t}`);
+                    return;
+                }
+
+            } catch (error) {
+                addDebugInfo(`❌ 解析错误: ${error.message}`);
+                return;
+            }
+
+            // 计算速度
+            const v1 = L / t;
+            const v2 = (v1 * R2) / R1;
+
+            addDebugInfo(`✅ 计算结果: t=${t}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
+
+            // 检查计算结果
+            if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) {
+                addDebugInfo(`❌ 计算结果无效: v1=${v1}, v2=${v2}`);
+                return;
+            }
+
+            // 更新图表数据
+            const now = new Date().toLocaleTimeString();
+            chart.data.labels.push(now);
+            chart.data.datasets[0].data.push(v2);
+
+            // 保持最新的20个数据点
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+
+            chart.update('none'); // 使用'none'模式提高性能
+
+            addDebugInfo(`📊 图表已更新，数据点数量: ${chart.data.labels.length}`);
+        };
+
+        ws.onerror = function(error) {
+            updateStatus('连接错误', false);
+            addDebugInfo(`❌ WebSocket错误: ${error}`);
+            console.error('WebSocket错误:', error);
+        };
+
+        ws.onclose = function(event) {
+            updateStatus('连接已关闭', false);
+            addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code}, 原因: ${event.reason})`);
+            console.log('WebSocket连接已关闭');
+
+            // 可选：自动重连
+            setTimeout(() => {
+                addDebugInfo('尝试重新连接...');
+                location.reload();
+            }, 5000);
+        };
+
+    </script>
+</body>
+</html>

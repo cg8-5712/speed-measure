@@ -21,7 +21,7 @@ def send_mock_timestamps():
 
         while True:
             # 生成当前时间（毫秒）
-            current_time_ms = random.uniform(40, 100)
+            current_time_ms = random.uniform(90, 120)
 
             # 发送时间戳
             message = str(current_time_ms)
