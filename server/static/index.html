@@ -30,6 +30,62 @@
             position: relative;
         }
 
+        .header-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .control-button {
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(79, 195, 247, 0.3);
+            min-width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 195, 247, 0.4);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+        }
+
+        .control-button.stop {
+            background: linear-gradient(135deg, #ffb74d 0%, #ffa726 100%);
+            box-shadow: 0 4px 15px rgba(255, 183, 77, 0.3);
+        }
+
+        .control-button.stop:hover {
+            box-shadow: 0 6px 20px rgba(255, 183, 77, 0.4);
+        }
+
+        .control-button:disabled {
+            background: linear-gradient(135deg, #bbb 0%, #999 100%);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .control-button:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
         .settings-button {
             position: absolute;
             top: 0;
@@ -582,6 +638,16 @@
                 height: 45px;
                 font-size: 1.1rem;
             }
+
+            .header-controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .control-button {
+                min-width: 200px;
+                padding: 15px 24px;
+            }
         }
 
         /* 滚动条样式 */
@@ -623,6 +689,14 @@
         <div class="header">
             <h1>🏎️ 速度监测系统</h1>
             <div id="status" class="status disconnected">WebSocket状态: 未连接</div>
+            <div class="header-controls">
+                <button id="startButton" class="control-button" onclick="startConnection()">
+                    ▶️ 启动连接
+                </button>
+                <button id="stopButton" class="control-button stop" onclick="stopConnection()" disabled>
+                    ⏸️ 停止连接
+                </button>
+            </div>
             <button class="settings-button" onclick="openSettings()">⚙️</button>
         </div>
 
@@ -667,6 +741,12 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
+                </div>
+
+                <div class="setting-group">
+                    <button class="control-button" onclick="resetLapData(); closeSettings();" style="width: 100%;">
+                        🔄 重置数据
+                    </button>
                 </div>
             </div>
         </div>
@@ -740,6 +820,224 @@
         let debugMessages = []; // 存储调试信息
         let showDebugInfo = true; // 是否显示调试信息
 
+        // WebSocket相关变量
+        let ws = null;
+        let isConnecting = false;
+        let shouldConnect = false; // 是否应该保持连接
+        let reconnectAttempts = 0;
+        let maxReconnectAttempts = 5;
+        let reconnectInterval = 3000; // 3秒重连间隔
+
+        // WebSocket连接控制函数
+        function startConnection() {
+            if (isConnecting || (ws && ws.readyState === WebSocket.OPEN)) {
+                return;
+            }
+
+            shouldConnect = true;
+            reconnectAttempts = 0;
+            updateControlButtons('connecting');
+            connectWebSocket();
+        }
+
+        function stopConnection() {
+            shouldConnect = false;
+
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+
+            updateControlButtons('disconnected');
+            updateStatus('已断开连接', false);
+            addDebugInfo('🔴 用户手动断开连接');
+        }
+
+        function updateControlButtons(state) {
+            const startBtn = document.getElementById('startButton');
+            const stopBtn = document.getElementById('stopButton');
+
+            switch(state) {
+                case 'connecting':
+                    startBtn.disabled = true;
+                    startBtn.innerHTML = '🔄 连接中...';
+                    stopBtn.disabled = false;
+                    break;
+                case 'connected':
+                    startBtn.disabled = true;
+                    startBtn.innerHTML = '✅ 已连接';
+                    stopBtn.disabled = false;
+                    break;
+                case 'disconnected':
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '▶️ 启动连接';
+                    stopBtn.disabled = true;
+                    break;
+            }
+        }
+
+        function connectWebSocket() {
+            if (!shouldConnect || isConnecting) {
+                return;
+            }
+
+            isConnecting = true;
+            addDebugInfo('🔄 尝试连接WebSocket...');
+
+            try {
+                ws = new WebSocket('ws://127.0.0.1:8080');
+
+                ws.onopen = function() {
+                    isConnecting = false;
+                    reconnectAttempts = 0;
+                    updateStatus('已连接', true);
+                    updateControlButtons('connected');
+                    addDebugInfo('✅ WebSocket连接成功');
+                };
+
+                ws.onmessage = function(event) {
+                    handleWebSocketMessage(event);
+                };
+
+                ws.onerror = function(error) {
+                    isConnecting = false;
+                    updateStatus('连接错误', false);
+                    addDebugInfo(`❌ WebSocket错误: ${error}`);
+                    console.error('WebSocket错误:', error);
+
+                    if (shouldConnect) {
+                        scheduleReconnect();
+                    }
+                };
+
+                ws.onclose = function(event) {
+                    isConnecting = false;
+
+                    if (shouldConnect && reconnectAttempts < maxReconnectAttempts) {
+                        updateStatus('连接已断开，准备重连', false);
+                        addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code})，${reconnectInterval/1000}秒后重连...`);
+                        scheduleReconnect();
+                    } else if (shouldConnect) {
+                        updateStatus('连接失败，已停止重连', false);
+                        updateControlButtons('disconnected');
+                        shouldConnect = false;
+                        addDebugInfo(`❌ 重连尝试已达到最大次数(${maxReconnectAttempts})，停止重连`);
+                    } else {
+                        updateStatus('连接已关闭', false);
+                        addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code})`);
+                    }
+                };
+
+            } catch (error) {
+                isConnecting = false;
+                addDebugInfo(`❌ 连接创建失败: ${error.message}`);
+                if (shouldConnect) {
+                    scheduleReconnect();
+                }
+            }
+        }
+
+        function scheduleReconnect() {
+            if (!shouldConnect) return;
+
+            reconnectAttempts++;
+            updateControlButtons('connecting');
+
+            setTimeout(() => {
+                if (shouldConnect && reconnectAttempts <= maxReconnectAttempts) {
+                    addDebugInfo(`🔄 第${reconnectAttempts}次重连尝试...`);
+                    connectWebSocket();
+                }
+            }, reconnectInterval);
+        }
+
+        function handleWebSocketMessage(event) {
+            addDebugInfo(`接收到原始数据: "${event.data}" (类型: ${typeof event.data})`);
+
+            let t;
+            try {
+                const cleanData = event.data.toString().trim();
+                addDebugInfo(`清理后的数据: "${cleanData}"`);
+
+                const jsonData = JSON.parse(cleanData);
+                addDebugInfo(`解析的JSON对象: ${JSON.stringify(jsonData)}`);
+
+                if (!jsonData.data) {
+                    addDebugInfo(`❌ JSON对象中没有找到'data'字段`);
+                    return;
+                }
+
+                t = parseFloat(jsonData.data);
+                addDebugInfo(`解析结果: t = ${t} (类型: ${typeof t})`);
+                addDebugInfo(`来源: ${jsonData.from}, 时间戳: ${jsonData.timestamp}`);
+
+                if (isNaN(t) || !isFinite(t)) {
+                    addDebugInfo(`❌ 解析失败: t 不是有效数字`);
+                    return;
+                }
+
+                if (t <= 0) {
+                    addDebugInfo(`❌ 无效数据: t 必须大于0，当前值: ${t}`);
+                    return;
+                }
+
+                const currentTime = Date.now();
+
+                if (isFirstData) {
+                    isFirstData = false;
+                    lastDataTime = currentTime;
+                    addDebugInfo(`首次数据 t=${t}ms，仅用于初始化时间基准，不计入圈数`);
+                    return;  // ❗只初始化，不记为一圈
+                }
+
+                // 正常圈数记录逻辑
+                const interval = currentTime - lastDataTime;
+                lastDataTime = currentTime;
+                lapCount++;
+
+                const lapTime = calculateLapTime(interval, t);
+                totalTime += lapTime;
+                lapTimes.push(lapTime);
+                lapDetails.push({
+                    lap: lapCount,
+                    lapTime: lapTime
+                });
+
+                addDebugInfo(`第${lapCount}圈完成，用时: ${lapTime.toFixed(3)}ms`);
+
+                if (lapDetails.length > lapDisplayLimit * 2) {
+                    lapDetails = lapDetails.slice(-lapDisplayLimit);
+                }
+
+                updateLapInfo();
+
+                const v1 = L / t;
+                const v2 = (v1 * R2) / R1;
+
+                addDebugInfo(`✅ 计算结果: t=${t.toFixed(3)}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
+
+                if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) {
+                    addDebugInfo(`❌ 计算结果无效: v1=${v1}, v2=${v2}`);
+                    return;
+                }
+
+                const now = new Date().toLocaleTimeString();
+                chart.data.labels.push(now);
+                chart.data.datasets[0].data.push(v2);
+
+                if (chart.data.labels.length > 20) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+
+                chart.update('none');
+                addDebugInfo(`📊 图表已更新，数据点数量: ${chart.data.labels.length}`);
+            } catch (error) {
+                addDebugInfo(`❌ 解析错误: ${error.message}`);
+                return;
+            }
+        }
+
         // 设置相关函数
         function openSettings() {
             document.getElementById('settingsModal').style.display = 'block';
@@ -775,16 +1073,7 @@
             // 目标圈数设置
             document.getElementById('settingLapNumber').addEventListener('change', function(e) {
                 targetLaps = parseInt(e.target.value) || 3;
-                isFirstData = true;
-                lapCount = 0;
-                totalTime = 0;
-                lastDataTime = null;
-                lapDetails = [];
-                lapTimes = [];
-                debugMessages = [];
-                document.getElementById('statsSection').style.display = 'none';
-                updateLapInfo();
-                updateDebugDisplay();
+                resetLapData();
             });
 
             // 详细信息显示数量设置
@@ -807,6 +1096,19 @@
                 const debugDiv = document.getElementById('debugInfo');
                 debugDiv.style.display = showDebugInfo ? 'flex' : 'none';
             });
+        }
+
+        // 重置圈数据
+        function resetLapData() {
+            isFirstData = true;
+            lapCount = 0;
+            totalTime = 0;
+            lastDataTime = null;
+            lapDetails = [];
+            lapTimes = [];
+            document.getElementById('statsSection').style.display = 'none';
+            updateLapInfo();
+            addDebugInfo('🔄 数据已重置');
         }
 
         function calculateLapTime(interval, measurement) {
@@ -1020,122 +1322,15 @@
         // 初始设置调试信息显示状态
         document.getElementById('debugInfo').style.display = showDebugInfo ? 'flex' : 'none';
 
+        // 初始化状态显示
+        updateStatus('未连接', false);
+
         // 初始化调试信息
-        debugMessages.push('<div style="color: #6c757d; font-style: italic;">⏳ 等待WebSocket连接...</div>');
+        debugMessages.push('<div style="color: #6c757d; font-style: italic;">📱 系统已就绪，点击"启动连接"开始监测</div>');
         updateDebugDisplay();
 
-        // 连接WebSocket
-        addDebugInfo('🔄 尝试连接WebSocket...');
-        const ws = new WebSocket('ws://127.0.0.1:8080');
-
-        ws.onopen = function() {
-            updateStatus('已连接', true);
-            addDebugInfo('✅ WebSocket连接成功');
-        };
-
-        ws.onmessage = function(event) {
-            addDebugInfo(`接收到原始数据: "${event.data}" (类型: ${typeof event.data})`);
-
-            let t;
-            try {
-                const cleanData = event.data.toString().trim();
-                addDebugInfo(`清理后的数据: "${cleanData}"`);
-
-                const jsonData = JSON.parse(cleanData);
-                addDebugInfo(`解析的JSON对象: ${JSON.stringify(jsonData)}`);
-
-                if (!jsonData.data) {
-                    addDebugInfo(`❌ JSON对象中没有找到'data'字段`);
-                    return;
-                }
-
-                t = parseFloat(jsonData.data);
-                addDebugInfo(`解析结果: t = ${t} (类型: ${typeof t})`);
-                addDebugInfo(`来源: ${jsonData.from}, 时间戳: ${jsonData.timestamp}`);
-
-                if (isNaN(t) || !isFinite(t)) {
-                    addDebugInfo(`❌ 解析失败: t 不是有效数字`);
-                    return;
-                }
-
-                if (t <= 0) {
-                    addDebugInfo(`❌ 无效数据: t 必须大于0，当前值: ${t}`);
-                    return;
-                }
-
-                const currentTime = Date.now();
-
-                if (isFirstData) {
-                    isFirstData = false;
-                    lastDataTime = currentTime;
-                    addDebugInfo(`首次数据 t=${t}ms，仅用于初始化时间基准，不计入圈数`);
-                    return;  // ❗只初始化，不记为一圈
-                }
-
-                // 正常圈数记录逻辑
-                const interval = currentTime - lastDataTime;
-                lastDataTime = currentTime;
-                lapCount++;
-
-                const lapTime = calculateLapTime(interval, t);
-                totalTime += lapTime;
-                lapTimes.push(lapTime);
-                lapDetails.push({
-                    lap: lapCount,
-                    lapTime: lapTime
-                });
-
-                addDebugInfo(`第${lapCount}圈完成，用时: ${lapTime.toFixed(3)}ms`);
-
-                if (lapDetails.length > lapDisplayLimit * 2) {
-                    lapDetails = lapDetails.slice(-lapDisplayLimit);
-                }
-
-                updateLapInfo();
-
-                const v1 = L / t;
-                const v2 = (v1 * R2) / R1;
-
-                addDebugInfo(`✅ 计算结果: t=${t.toFixed(3)}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
-
-                if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) {
-                    addDebugInfo(`❌ 计算结果无效: v1=${v1}, v2=${v2}`);
-                    return;
-                }
-
-                const now = new Date().toLocaleTimeString();
-                chart.data.labels.push(now);
-                chart.data.datasets[0].data.push(v2);
-
-                if (chart.data.labels.length > 20) {
-                    chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
-                }
-
-                chart.update('none');
-                addDebugInfo(`📊 图表已更新，数据点数量: ${chart.data.labels.length}`);
-            } catch (error) {
-                addDebugInfo(`❌ 解析错误: ${error.message}`);
-                return;
-            }
-        };
-
-        ws.onerror = function(error) {
-            updateStatus('连接错误', false);
-            addDebugInfo(`❌ WebSocket错误: ${error}`);
-            console.error('WebSocket错误:', error);
-        };
-
-        ws.onclose = function(event) {
-            updateStatus('连接已关闭', false);
-            addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code}, 原因: ${event.reason})`);
-            console.log('WebSocket连接已关闭');
-
-            setTimeout(() => {
-                addDebugInfo('尝试重新连接...');
-                location.reload();
-            }, 5000);
-        };
+        // 初始化按钮状态
+        updateControlButtons('disconnected');
 
     </script>
 </body>
