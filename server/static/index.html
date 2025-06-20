@@ -16,6 +16,8 @@
             min-height: 100vh;
             color: #37474f;
             line-height: 1.6;
+            margin: 0;
+            padding: 0;
         }
 
         .container {
@@ -614,6 +616,118 @@
             border-bottom: none;
         }
 
+        .footer {
+            background: linear-gradient(135deg, #eceff1 0%, #cfd8dc 100%);
+            color: #546e7a;
+            padding: 30px 0;
+            margin-top: 40px;
+            border-top: 1px solid #e0f2f1;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+
+        .footer-section {
+            text-align: center;
+        }
+
+        .footer-section h3 {
+            color: #37474f;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #4fc3f7;
+            display: inline-block;
+        }
+
+        .footer-section p {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .footer-section a {
+            color: #4fc3f7;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-section a:hover {
+            color: #29b6f6;
+            text-decoration: underline;
+        }
+
+        .tech-stack {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .tech-badge {
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .footer-bottom {
+            background: #37474f;
+            color: #b0bec5;
+            text-align: center;
+            padding: 15px 0;
+            font-size: 0.85rem;
+        }
+
+        .footer-bottom a {
+            color: #4fc3f7;
+            text-decoration: none;
+        }
+
+        .footer-bottom a:hover {
+            color: #29b6f6;
+        }
+
+        .version-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(79, 195, 247, 0.1);
+            padding: 6px 12px;
+            border-radius: 15px;
+            margin-top: 10px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            background: #4caf50;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+            }
+        }
+
         /* 响应式设计 */
         @media (max-width: 768px) {
             .data-panels {
@@ -647,6 +761,45 @@
             .control-button {
                 min-width: 200px;
                 padding: 15px 24px;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                text-align: center;
+            }
+
+            .tech-stack {
+                justify-content: center;
+            }
+
+            .footer-bottom {
+                padding: 20px 10px;
+                line-height: 1.6;
+            }
+
+            .footer-bottom p {
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .tech-stack {
+                gap: 5px;
+            }
+
+            .tech-badge {
+                font-size: 0.75rem;
+                padding: 3px 8px;
+            }
+
+            .footer-section p {
+                font-size: 0.85rem;
+            }
+
+            .version-info {
+                font-size: 0.8rem;
+                padding: 4px 8px;
             }
         }
 
@@ -798,6 +951,59 @@
             <div class="debug-content" id="debugContent"></div>
         </div>
     </div>
+
+    <!-- Footer 页脚 -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>🏎️ 系统信息</h3>
+                <p><strong>速度监测系统</strong></p>
+                <p>实时WebSocket数据监测</p>
+                <p>高精度圈速分析工具</p>
+                <div class="version-info">
+                    <div class="status-indicator"></div>
+                    <span>v1.0.0 - 正常运行</span>
+                </div>
+            </div>
+
+            <div class="footer-section">
+                <h3>🛠️ 技术栈</h3>
+                <p>基于现代Web技术构建</p>
+                <div class="tech-stack">
+                    <span class="tech-badge">HTML5</span>
+                    <span class="tech-badge">CSS3</span>
+                    <span class="tech-badge">JavaScript</span>
+                    <span class="tech-badge">WebSocket</span>
+                    <span class="tech-badge">Chart.js</span>
+                </div>
+            </div>
+
+            <div class="footer-section">
+                <h3>📊 功能特性</h3>
+                <p>• 实时速度监测与计算</p>
+                <p>• 圈速数据分析统计</p>
+                <p>• 可视化图表展示</p>
+                <p>• 响应式界面设计</p>
+                <p>• 智能重连机制</p>
+            </div>
+
+            <div class="footer-section">
+                <h3>🔧 使用说明</h3>
+                <p>1. 点击"启动连接"开始监测</p>
+                <p>2. 通过设置调整参数</p>
+                <p>3. 查看实时数据和统计</p>
+                <p>4. 分析圈速表现趋势</p>
+                <p><a href="#" onclick="openSettings()">⚙️ 打开系统设置</a></p>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2025 速度监测系统. All rights reserved. |
+            Powered by <a href="#" title="WebSocket Technology">WebSocket</a> &
+            <a href="#" title="Chart.js Library">Chart.js</a> |
+            Design with ❄️ 清凉风格</p>
+        </div>
+    </footer>
 
     <script>
         // 常量定义
@@ -1331,6 +1537,18 @@
 
         // 初始化按钮状态
         updateControlButtons('disconnected');
+
+        // 更新footer年份
+        updateFooterYear();
+
+        // 更新footer年份函数
+        function updateFooterYear() {
+            const currentYear = new Date().getFullYear();
+            const footerText = document.querySelector('.footer-bottom p');
+            if (footerText && currentYear !== 2025) {
+                footerText.innerHTML = footerText.innerHTML.replace('2025', currentYear);
+            }
+        }
 
     </script>
 </body>
