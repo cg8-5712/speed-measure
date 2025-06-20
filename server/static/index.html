@@ -34,10 +34,30 @@
             background: #f8d7da;
             color: #721c24;
         }
+        .lap-info {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
     <div id="status" class="status disconnected">WebSocket状态: 未连接</div>
+
+    <div class="lap-info">
+        <div class="input-group">
+            <label for="lapNumber">目标圈数: </label>
+            <input type="number" id="lapNumber" value="3" min="1" max="100">
+        </div>
+        <div>当前圈数: <span id="currentLap">0</span></div>
+        <div>总计时间: <span id="totalTime">0</span> ms</div>
+        <div>详细信息: <div id="lapDetails"></div></div>
+    </div>
 
     <div class="chart-container">
         <canvas id="velocityChart"></canvas>
@@ -55,6 +75,34 @@
         const R2 = 15;  // 半径2
 
         console.log('常量值:', { L, R1, R2 });
+
+        // 计圈相关变量
+        let isFirstData = true;
+        let lapCount = 0;
+        let totalTime = 0;
+        let lastDataTime = null;
+        let targetLaps = 3;
+        let lapDetails = [];
+        let isTimingComplete = false;
+
+        function updateLapInfo() {
+            document.getElementById('currentLap').textContent = lapCount;
+            document.getElementById('totalTime').textContent = totalTime;
+            document.getElementById('lapDetails').innerHTML = lapDetails.map(
+                detail => `<div>第${detail.lap}圈: 间隔${detail.interval}ms, 测量值${detail.measurement}ms</div>`
+            ).join('');
+        }
+
+        document.getElementById('lapNumber').addEventListener('change', function(e) {
+            targetLaps = parseInt(e.target.value) || 3;
+            isFirstData = true;
+            lapCount = 0;
+            totalTime = 0;
+            lastDataTime = null;
+            lapDetails = [];
+            isTimingComplete = false;
+            updateLapInfo();
+        });
 
         // 调试信息显示函数
         function addDebugInfo(message) {
@@ -122,74 +170,96 @@
         };
 
         ws.onmessage = function(event) {
-            // 详细的调试信息
             addDebugInfo(`接收到原始数据: "${event.data}" (类型: ${typeof event.data})`);
 
-            // 尝试解析数据
             let t;
             try {
-                // 先清理数据（去除空白字符）
                 const cleanData = event.data.toString().trim();
                 addDebugInfo(`清理后的数据: "${cleanData}"`);
 
-                // 解析JSON数据
                 const jsonData = JSON.parse(cleanData);
                 addDebugInfo(`解析的JSON对象: ${JSON.stringify(jsonData)}`);
 
-                // 提取data字段
                 if (!jsonData.data) {
                     addDebugInfo(`❌ JSON对象中没有找到'data'字段`);
                     return;
                 }
 
-                // 将data字段解析为浮点数
                 t = parseFloat(jsonData.data);
                 addDebugInfo(`解析结果: t = ${t} (类型: ${typeof t})`);
                 addDebugInfo(`来源: ${jsonData.from}, 时间戳: ${jsonData.timestamp}`);
 
-                // 检查是否为有效数字
                 if (isNaN(t) || !isFinite(t)) {
                     addDebugInfo(`❌ 解析失败: t 不是有效数字`);
                     return;
                 }
 
-                // 检查是否为正数（时间不能为负数或零）
                 if (t <= 0) {
                     addDebugInfo(`❌ 无效数据: t 必须大于0，当前值: ${t}`);
                     return;
                 }
 
+                if (isTimingComplete) {
+                    addDebugInfo('已完成计时，不再记录新的圈数');
+                    return;
+                }
+
+                const currentTime = Date.now();
+                
+                if (isFirstData) {
+                    isFirstData = false;
+                    lastDataTime = currentTime;
+                    lapCount = 1;
+                    totalTime = t;
+                    lapDetails.push({
+                        lap: lapCount,
+                        interval: 0,
+                        measurement: t
+                    });
+                } else {
+                    const interval = currentTime - lastDataTime;
+                    lastDataTime = currentTime;
+                    lapCount++;
+                    totalTime += interval + t;
+                    lapDetails.push({
+                        lap: lapCount,
+                        interval: interval,
+                        measurement: t
+                    });
+
+                    if (lapCount >= targetLaps) {
+                        isTimingComplete = true;
+                        addDebugInfo(`✅ 完成${targetLaps}圈计时！总时间: ${totalTime}ms`);
+                    }
+                }
+
+                updateLapInfo();
+
+                const v1 = L / t;
+                const v2 = (v1 * R2) / R1;
+
+                addDebugInfo(`✅ 计算结果: t=${t}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
+
+                if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) {
+                    addDebugInfo(`❌ 计算结果无效: v1=${v1}, v2=${v2}`);
+                    return;
+                }
+
+                const now = new Date().toLocaleTimeString();
+                chart.data.labels.push(now);
+                chart.data.datasets[0].data.push(v2);
+
+                if (chart.data.labels.length > 20) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+
+                chart.update('none');
+                addDebugInfo(`📊 图表已更新，数据点数量: ${chart.data.labels.length}`);
             } catch (error) {
                 addDebugInfo(`❌ 解析错误: ${error.message}`);
                 return;
             }
-
-            // 计算速度
-            const v1 = L / t;
-            const v2 = (v1 * R2) / R1;
-
-            addDebugInfo(`✅ 计算结果: t=${t}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
-
-            // 检查计算结果
-            if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) {
-                addDebugInfo(`❌ 计算结果无效: v1=${v1}, v2=${v2}`);
-                return;
-            }
-
-            // 更新图表数据
-            const now = new Date().toLocaleTimeString();
-            chart.data.labels.push(now);
-            chart.data.datasets[0].data.push(v2);
-
-            // 保持最新的20个数据点
-            if (chart.data.labels.length > 20) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-            }
-
-            chart.update('none'); // 使用'none'模式提高性能
-
-            addDebugInfo(`📊 图表已更新，数据点数量: ${chart.data.labels.length}`);
         };
 
         ws.onerror = function(error) {
@@ -203,7 +273,6 @@
             addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code}, 原因: ${event.reason})`);
             console.log('WebSocket连接已关闭');
 
-            // 可选：自动重连
             setTimeout(() => {
                 addDebugInfo('尝试重新连接...');
                 location.reload();
