@@ -1006,550 +1006,611 @@
     </footer>
 
     <script>
-        // 常量定义
-        const L = 3;  // 距离
-        const R1 = 3.5 / 100;  // 半径1 (0.035)
-        const R2 = 15;  // 半径2
-
-        console.log('常量值:', { L, R1, R2 });
-
-        // 计圈相关变量
-        let isFirstData = true;
-        let lapCount = 0;
-        let totalTime = 0;
-        let lastDataTime = null;
-        let targetLaps = 3;
-        let lapDetails = [];
-        let lapTimes = []; // 存储每圈的用时
-        let lapDisplayLimit = 1000; // 详细信息显示限制
-        let debugDisplayLimit = 1000; // 调试信息显示限制
-        let debugMessages = []; // 存储调试信息
-        let showDebugInfo = true; // 是否显示调试信息
-
-        // WebSocket相关变量
-        let ws = null;
-        let isConnecting = false;
-        let shouldConnect = false; // 是否应该保持连接
-        let reconnectAttempts = 0;
-        let maxReconnectAttempts = 5;
-        let reconnectInterval = 3000; // 3秒重连间隔
-
-        // WebSocket连接控制函数
-        function startConnection() {
-            if (isConnecting || (ws && ws.readyState === WebSocket.OPEN)) {
-                return;
-            }
-
-            shouldConnect = true;
-            reconnectAttempts = 0;
-            updateControlButtons('connecting');
-            connectWebSocket();
-        }
-
-        function stopConnection() {
-            shouldConnect = false;
-
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-
-            updateControlButtons('disconnected');
-            updateStatus('已断开连接', false);
-            addDebugInfo('🔴 用户手动断开连接');
-        }
-
-        function updateControlButtons(state) {
-            const startBtn = document.getElementById('startButton');
-            const stopBtn = document.getElementById('stopButton');
-
-            switch(state) {
-                case 'connecting':
-                    startBtn.disabled = true;
-                    startBtn.innerHTML = '🔄 连接中...';
-                    stopBtn.disabled = false;
-                    break;
-                case 'connected':
-                    startBtn.disabled = true;
-                    startBtn.innerHTML = '✅ 已连接';
-                    stopBtn.disabled = false;
-                    break;
-                case 'disconnected':
-                    startBtn.disabled = false;
-                    startBtn.innerHTML = '▶️ 启动连接';
-                    stopBtn.disabled = true;
-                    break;
-            }
-        }
-
-        function connectWebSocket() {
-            if (!shouldConnect || isConnecting) {
-                return;
-            }
-
-            isConnecting = true;
-            addDebugInfo('🔄 尝试连接WebSocket...');
-
-            try {
-                ws = new WebSocket('ws://127.0.0.1:8080');
-
-                ws.onopen = function() {
-                    isConnecting = false;
-                    reconnectAttempts = 0;
-                    updateStatus('已连接', true);
-                    updateControlButtons('connected');
-                    addDebugInfo('✅ WebSocket连接成功');
-                };
-
-                ws.onmessage = function(event) {
-                    handleWebSocketMessage(event);
-                };
-
-                ws.onerror = function(error) {
-                    isConnecting = false;
-                    updateStatus('连接错误', false);
-                    addDebugInfo(`❌ WebSocket错误: ${error}`);
-                    console.error('WebSocket错误:', error);
-
-                    if (shouldConnect) {
-                        scheduleReconnect();
-                    }
-                };
-
-                ws.onclose = function(event) {
-                    isConnecting = false;
-
-                    if (shouldConnect && reconnectAttempts < maxReconnectAttempts) {
-                        updateStatus('连接已断开，准备重连', false);
-                        addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code})，${reconnectInterval/1000}秒后重连...`);
-                        scheduleReconnect();
-                    } else if (shouldConnect) {
-                        updateStatus('连接失败，已停止重连', false);
-                        updateControlButtons('disconnected');
-                        shouldConnect = false;
-                        addDebugInfo(`❌ 重连尝试已达到最大次数(${maxReconnectAttempts})，停止重连`);
-                    } else {
-                        updateStatus('连接已关闭', false);
-                        addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code})`);
-                    }
-                };
-
-            } catch (error) {
-                isConnecting = false;
-                addDebugInfo(`❌ 连接创建失败: ${error.message}`);
-                if (shouldConnect) {
-                    scheduleReconnect();
-                }
-            }
-        }
-
-        function scheduleReconnect() {
-            if (!shouldConnect) return;
-
-            reconnectAttempts++;
-            updateControlButtons('connecting');
-
-            setTimeout(() => {
-                if (shouldConnect && reconnectAttempts <= maxReconnectAttempts) {
-                    addDebugInfo(`🔄 第${reconnectAttempts}次重连尝试...`);
-                    connectWebSocket();
-                }
-            }, reconnectInterval);
-        }
-
-        function handleWebSocketMessage(event) {
-            addDebugInfo(`接收到原始数据: "${event.data}" (类型: ${typeof event.data})`);
-
-            let t;
-            try {
-                const cleanData = event.data.toString().trim();
-                addDebugInfo(`清理后的数据: "${cleanData}"`);
-
-                const jsonData = JSON.parse(cleanData);
-                addDebugInfo(`解析的JSON对象: ${JSON.stringify(jsonData)}`);
-
-                if (!jsonData.data) {
-                    addDebugInfo(`❌ JSON对象中没有找到'data'字段`);
-                    return;
-                }
-
-                t = parseFloat(jsonData.data);
-                addDebugInfo(`解析结果: t = ${t} (类型: ${typeof t})`);
-                addDebugInfo(`来源: ${jsonData.from}, 时间戳: ${jsonData.timestamp}`);
-
-                if (isNaN(t) || !isFinite(t)) {
-                    addDebugInfo(`❌ 解析失败: t 不是有效数字`);
-                    return;
-                }
-
-                if (t <= 0) {
-                    addDebugInfo(`❌ 无效数据: t 必须大于0，当前值: ${t}`);
-                    return;
-                }
-
-                const currentTime = Date.now();
-
-                if (isFirstData) {
-                    isFirstData = false;
-                    lastDataTime = currentTime;
-                    addDebugInfo(`首次数据 t=${t}ms，仅用于初始化时间基准，不计入圈数`);
-                    return;  // ❗只初始化，不记为一圈
-                }
-
-                // 正常圈数记录逻辑
-                const interval = currentTime - lastDataTime;
-                lastDataTime = currentTime;
-                lapCount++;
-
-                const lapTime = calculateLapTime(interval, t);
-                totalTime += lapTime;
-                lapTimes.push(lapTime);
-                lapDetails.push({
-                    lap: lapCount,
-                    lapTime: lapTime
-                });
-
-                addDebugInfo(`第${lapCount}圈完成，用时: ${lapTime.toFixed(3)}ms`);
-
-                if (lapDetails.length > lapDisplayLimit * 2) {
-                    lapDetails = lapDetails.slice(-lapDisplayLimit);
-                }
-
-                updateLapInfo();
-
-                const v1 = L / t;
-                const v2 = (v1 * R2) / R1;
-
-                addDebugInfo(`✅ 计算结果: t=${t.toFixed(3)}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
-
-                if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) {
-                    addDebugInfo(`❌ 计算结果无效: v1=${v1}, v2=${v2}`);
-                    return;
-                }
-
-                const now = new Date().toLocaleTimeString();
-                chart.data.labels.push(now);
-                chart.data.datasets[0].data.push(v2);
-
-                if (chart.data.labels.length > 20) {
-                    chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
-                }
-
-                chart.update('none');
-                addDebugInfo(`📊 图表已更新，数据点数量: ${chart.data.labels.length}`);
-            } catch (error) {
-                addDebugInfo(`❌ 解析错误: ${error.message}`);
-                return;
-            }
-        }
-
-        // 设置相关函数
-        function openSettings() {
-            document.getElementById('settingsModal').style.display = 'block';
-            // 同步当前设置到模态窗口
-            document.getElementById('settingLapNumber').value = targetLaps;
-            document.getElementById('settingLapDisplayLimit').value = lapDisplayLimit;
-            document.getElementById('settingDebugDisplayLimit').value = debugDisplayLimit;
-            document.getElementById('settingShowDebug').checked = showDebugInfo;
-            updateSettingDisplays();
-        }
-
-        function closeSettings() {
-            document.getElementById('settingsModal').style.display = 'none';
-        }
-
-        function updateSettingDisplays() {
-            document.getElementById('settingLapDisplayValue').textContent =
-                document.getElementById('settingLapDisplayLimit').value + ' 圈';
-            document.getElementById('settingDebugDisplayValue').textContent =
-                document.getElementById('settingDebugDisplayLimit').value + ' 条';
-        }
-
-        // 点击模态窗口外部关闭设置
-        window.onclick = function(event) {
-            const modal = document.getElementById('settingsModal');
-            if (event.target === modal) {
-                closeSettings();
-            }
-        }
-
-        // 初始化设置控制
-        function initializeSettings() {
-            // 目标圈数设置
-            document.getElementById('settingLapNumber').addEventListener('change', function(e) {
-                targetLaps = parseInt(e.target.value) || 3;
-                resetLapData();
-            });
-
-            // 详细信息显示数量设置
-            document.getElementById('settingLapDisplayLimit').addEventListener('input', function() {
-                lapDisplayLimit = parseInt(this.value);
-                updateSettingDisplays();
-                updateLapInfo(); // 重新更新显示
-            });
-
-            // 调试信息显示数量设置
-            document.getElementById('settingDebugDisplayLimit').addEventListener('input', function() {
-                debugDisplayLimit = parseInt(this.value);
-                updateSettingDisplays();
-                updateDebugDisplay(); // 重新更新调试信息显示
-            });
-
-            // 调试信息显示开关
-            document.getElementById('settingShowDebug').addEventListener('change', function() {
-                showDebugInfo = this.checked;
-                const debugDiv = document.getElementById('debugInfo');
-                debugDiv.style.display = showDebugInfo ? 'flex' : 'none';
-            });
-        }
-
-        // 重置圈数据
-        function resetLapData() {
-            isFirstData = true;
-            lapCount = 0;
-            totalTime = 0;
-            lastDataTime = null;
-            lapDetails = [];
-            lapTimes = [];
-            document.getElementById('statsSection').style.display = 'none';
-            updateLapInfo();
-            addDebugInfo('🔄 数据已重置');
-        }
-
-        function calculateLapTime(interval, measurement) {
-            // 每圈总用时 = 间隔时间 + 测量值
-            return interval + measurement;
-        }
-
-        function updateRecentLapsDisplay() {
-            const n = targetLaps;
-            document.getElementById('recentLapsDisplayCount').textContent = n;
-
-            if (lapTimes.length < n) {
-                document.getElementById('recentLapsDetails').innerHTML = '<div style="text-align: center; color: #6c757d; padding: 20px;">⏳ 等待更多圈数数据...</div>';
-                return;
-            }
-
-            let recentLapsHTML = '';
-            let bestTime = Infinity;
-            let bestIndex = -1;
-
-            // 计算所有可能的n圈组合
-            for (let i = 0; i <= lapTimes.length - n; i++) {
-                const groupTimes = lapTimes.slice(i, i + n);
-                const groupSum = groupTimes.reduce((sum, time) => sum + time, 0);
-
-                if (groupSum < bestTime) {
-                    bestTime = groupSum;
-                    bestIndex = i;
-                }
-
-                const startLap = i + 1;
-                const endLap = i + n;
-                const itemClass = (groupSum === bestTime && bestIndex === i) ? 'recent-lap-item recent-lap-best' : 'recent-lap-item';
-
-                recentLapsHTML += `<div class="${itemClass}">第${startLap}-${endLap}圈: ${(groupSum/1000).toFixed(3)} s</div>`;
-            }
-
-            document.getElementById('recentLapsDetails').innerHTML = recentLapsHTML;
-
-            // 自动滚动到最新内容
-            const recentLapsDiv = document.getElementById('recentLapsDetails');
-            recentLapsDiv.scrollTop = recentLapsDiv.scrollHeight;
-        }
-
-        function updateLapInfo() {
-            document.getElementById('currentLap').textContent = lapCount;
-            document.getElementById('totalTime').textContent = (totalTime/1000).toFixed(3);
-
-            // 显示最近的lapDisplayLimit圈详细信息 - 保持毫秒
-            const displayDetails = lapDetails.slice(-lapDisplayLimit);
-            const lapDetailsDiv = document.getElementById('lapDetails');
-            lapDetailsDiv.innerHTML = displayDetails.map(
-                detail => `<div class="lap-item">第${detail.lap}圈: ${detail.lapTime.toFixed(3)} ms</div>`
-            ).join('');
-
-            // 自动滚动到最新内容
-            lapDetailsDiv.scrollTop = lapDetailsDiv.scrollHeight;
-
-            // 更新近n圈显示
-            updateRecentLapsDisplay();
-
-            // 只有当圈数达到目标圈数时才显示统计信息
-            if (lapCount >= targetLaps) {
-                document.getElementById('statsSection').style.display = 'block';
-                updateRecentLapsStats();
-            } else {
-                document.getElementById('statsSection').style.display = 'none';
-            }
-        }
-
-        function updateRecentLapsStats() {
-            if (lapTimes.length === 0) {
-                document.getElementById('recentLapsTotal').textContent = '0.000';
-                document.getElementById('bestLapsTime').textContent = '0.000';
-                return;
-            }
-
-            const n = targetLaps;
-            document.getElementById('recentLapsCount').textContent = n;
-            document.getElementById('bestLapsCount').textContent = n;
-
-            // 获取最近n圈
-            const recentLaps = lapTimes.slice(-n);
-            const recentTotal = recentLaps.reduce((sum, time) => sum + time, 0);
-            document.getElementById('recentLapsTotal').textContent = (recentTotal/1000).toFixed(3);
-
-            // 计算所有n圈组合中的最快时间
-            let bestTime = Infinity;
-            if (lapTimes.length >= n) {
-                for (let i = 0; i <= lapTimes.length - n; i++) {
-                    const groupSum = lapTimes.slice(i, i + n).reduce((sum, time) => sum + time, 0);
-                    if (groupSum < bestTime) {
-                        bestTime = groupSum;
-                    }
-                }
-            } else {
-                bestTime = recentTotal;
-            }
-
-            document.getElementById('bestLapsTime').textContent = bestTime === Infinity ? '0.000' : (bestTime/1000).toFixed(3);
-        }
-
-        function updateDebugDisplay() {
-            if (!showDebugInfo) return;
-
-            const debugContentDiv = document.getElementById('debugContent');
-            const displayMessages = debugMessages.slice(-debugDisplayLimit);
-            debugContentDiv.innerHTML = displayMessages.join('');
-            debugContentDiv.scrollTop = debugContentDiv.scrollHeight;
-        }
-
-        // 调试信息显示函数
-        function addDebugInfo(message) {
-            const time = new Date().toLocaleTimeString();
-            const formattedMessage = `<div>[${time}] ${message}</div>`;
-            debugMessages.push(formattedMessage);
-
-            // 保持debugMessages数组不会无限增长
-            if (debugMessages.length > debugDisplayLimit * 2) {
-                debugMessages = debugMessages.slice(-debugDisplayLimit);
-            }
-
-            updateDebugDisplay();
-        }
-
-        // 更新状态显示
-        function updateStatus(message, isConnected) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.textContent = `WebSocket状态: ${message}`;
-            statusDiv.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
-        }
-
-        // 初始化图表
-        const ctx = document.getElementById('velocityChart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: '🚀 V2 速度',
-                    data: [],
-                    borderColor: '#4fc3f7',
-                    backgroundColor: 'rgba(79, 195, 247, 0.1)',
-                    borderWidth: 3,
-                    pointBackgroundColor: '#4fc3f7',
-                    pointBorderColor: '#ffffff',
-                    pointBorderWidth: 2,
-                    pointRadius: 6,
-                    tension: 0.4,
-                    fill: true
-                }]
+        const AppState = {
+            // 常量定义
+            L : 3,  // 距离
+            R1 : 3.5 / 100,  // 半径1 (0.035)
+            R2 : 15,  // 半径2
+    
+            // 计圈相关变量
+            isFirstData : true,
+            lapCount : 0,
+            totalTime : 0,
+            lastDataTime : null,
+            targetLaps : 3,
+            lapDetails : [],
+            lapTimes : [], // 存储每圈的用时
+            lapDisplayLimit = 1000, // 详细信息显示限制
+
+            //调试相关信息
+            debugDisplayLimit : 1000, // 调试信息显示限制
+            debugMessages : [], // 存储调试信息
+            showDebugInfo : true, // 是否显示调试信息
+            lastRenderTime : 0, 
+            renderInterval = 200, // 每200ms最多渲染一次
+    
+            // WebSocket相关变量
+            ws : null,
+            isConnecting : false,
+            shouldConnect : false, // 是否应该保持连接
+            reconnectAttempts : 0,
+            maxReconnectAttempts : 5,
+            reconnectInterval : 3000,
+        };
+
+        const ConnectionManager = {
+            init() {
+                // 初始化按钮事件监听
+                document.getElementById('startButton').addEventListener('click', () => this.start());
+                document.getElementById('stopButton').addEventListener('click', () => this.stop());
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        labels: {
-                            usePointStyle: true,
-                            font: {
-                                size: 14,
-                                weight: '600'
+            
+            start() {
+                if (AppState.isConnecting || (AppState.ws && AppState.ws.readyState === WebSocket.OPEN)) {
+                    return;
+                }
+                
+                AppState.shouldConnect = true;
+                AppState.reconnectAttempts = 0;
+                UIManager.updateControlButtons('connecting');
+                this.connect();
+            },
+            
+            stop() {
+                AppState.shouldConnect = false;
+                AppState.reconnectAttempts = AppState.maxReconnectAttempts;
+                
+                if (AppState.ws) {
+                    try {
+                        AppState.ws.close();
+                    } catch (e) {
+                        console.error("关闭连接错误:", e);
+                        AppState.ws = null;
+                    }
+                }
+                
+                UIManager.updateControlButtons('disconnected');
+                UIManager.updateStatus('已断开连接', false);
+                UIManager.addDebugInfo('🔴 用户手动断开连接');
+            },
+            
+            connect() {
+                if (!AppState.shouldConnect || AppState.isConnecting) {
+                    return;
+                }
+                
+                AppState.isConnecting = true;
+                UIManager.addDebugInfo('🔄 尝试连接WebSocket...');
+                
+                try {
+                    AppState.ws = new WebSocket('ws://127.0.0.1:8080');
+                    
+                    AppState.ws.onopen = () => {
+                        AppState.isConnecting = false;
+                        AppState.reconnectAttempts = 0;
+                        UIManager.updateStatus('已连接', true);
+                        UIManager.updateControlButtons('connected');
+                        UIManager.addDebugInfo('✅ WebSocket连接成功');
+                    };
+                    
+                    AppState.ws.onmessage = (event) => {
+                        DataProcessor.handleMessage(event);
+                    };
+                    
+                    AppState.ws.onerror = (error) => {
+                        AppState.isConnecting = false;
+                        UIManager.updateStatus('连接错误', false);
+                        UIManager.addDebugInfo(`❌ WebSocket错误: ${error}`);
+                        console.error('WebSocket错误:', error);
+                        
+                        if (AppState.shouldConnect) {
+                            this.scheduleReconnect();
+                        }
+                    };
+                    
+                    AppState.ws.onclose = (event) => {
+                        AppState.isConnecting = false;
+                        
+                        if (AppState.shouldConnect && AppState.reconnectAttempts < AppState.maxReconnectAttempts) {
+                            UIManager.updateStatus('连接已断开，准备重连', false);
+                            UIManager.addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code})，${AppState.reconnectInterval/1000}秒后重连...`);
+                            this.scheduleReconnect();
+                        } else if (AppState.shouldConnect) {
+                            UIManager.updateStatus('连接失败，已停止重连', false);
+                            UIManager.updateControlButtons('disconnected');
+                            AppState.shouldConnect = false;
+                            UIManager.addDebugInfo(`❌ 重连尝试已达到最大次数(${AppState.maxReconnectAttempts})，停止重连`);
+                        } else {
+                            UIManager.updateStatus('连接已关闭', false);
+                            UIManager.addDebugInfo(`WebSocket连接已关闭 (代码: ${event.code})`);
+                        }
+                    };
+                    
+                } catch (error) {
+                    AppState.isConnecting = false;
+                    UIManager.addDebugInfo(`❌ 连接创建失败: ${error.message}`);
+                    if (AppState.shouldConnect) {
+                        this.scheduleReconnect();
+                    }
+                }
+            },
+            
+            scheduleReconnect() {
+                if (!AppState.shouldConnect) return;
+                
+                AppState.reconnectAttempts++;
+                UIManager.updateControlButtons('connecting');
+                
+                setTimeout(() => {
+                    if (AppState.shouldConnect && AppState.reconnectAttempts <= AppState.maxReconnectAttempts) {
+                        UIManager.addDebugInfo(`🔄 第${AppState.reconnectAttempts}次重连尝试...`);
+                        this.connect();
+                    }
+                }, AppState.reconnectInterval);
+            }
+        };
+        
+        const DataProcessor = {
+            calculateLapTime(interval, measurement) {
+                return interval + measurement;
+            },
+            
+            handleMessage(event) {
+                UIManager.addDebugInfo(`接收到原始数据: "${event.data}" (类型: ${typeof event.data})`);
+    
+                let t;
+                try {
+                    const cleanData = event.data.toString().trim();
+                    UIManager.addDebugInfo(`清理后的数据: "${cleanData}"`);
+    
+                    const jsonData = JSON.parse(cleanData);
+                    UIManager.addDebugInfo(`解析的JSON对象: ${JSON.stringify(jsonData)}`);
+    
+                    if (!jsonData.data) {
+                        UIManager.addDebugInfo(`❌ JSON对象中没有找到'data'字段`);
+                        return;
+                    }
+    
+                    t = parseFloat(jsonData.data);
+                    UIManager.addDebugInfo(`解析结果: t = ${t} (类型: ${typeof t})`);
+                    UIManager.addDebugInfo(`来源: ${jsonData.from}, 时间戳: ${jsonData.timestamp}`);
+    
+                    if (isNaN(t) || !isFinite(t)) {
+                        UIManager.addDebugInfo(`❌ 解析失败: t 不是有效数字`);
+                        return;
+                    }
+    
+                    if (t <= 0) {
+                        UIManager.addDebugInfo(`❌ 无效数据: t 必须大于0，当前值: ${t}`);
+                        return;
+                    }
+    
+                    const currentTime = Date.now();
+    
+                    if (AppState.isFirstData) {
+                        AppState.isFirstData = false;
+                        AppState.lastDataTime = currentTime;
+                        UIManager.addDebugInfo(`首次数据 t=${t}ms，仅用于初始化时间基准，不计入圈数`);
+                        return;
+                    }
+    
+                    // 正常圈数记录逻辑
+                    const interval = currentTime - AppState.lastDataTime;
+                    AppState.lastDataTime = currentTime;
+                    AppState.lapCount++;
+    
+                    const lapTime = this.calculateLapTime(interval, t);
+                    AppState.totalTime += lapTime;
+                    AppState.lapTimes.push(lapTime);
+                    AppState.lapDetails.push({
+                        lap: AppState.lapCount,
+                        lapTime: lapTime
+                    });
+    
+                    UIManager.addDebugInfo(`第${AppState.lapCount}圈完成，用时: ${lapTime.toFixed(3)}ms`);
+    
+                    if (AppState.lapDetails.length > AppState.lapDisplayLimit * 2) {
+                        AppState.lapDetails = AppState.lapDetails.slice(-AppState.lapDisplayLimit);
+                    }
+    
+                    UIManager.updateLapInfo();
+    
+                    const v1 = AppState.L / t;
+                    const v2 = (v1 * AppState.R2) / AppState.R1;
+    
+                    UIManager.addDebugInfo(`✅ 计算结果: t=${t.toFixed(3)}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
+    
+                    if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) {
+                        UIManager.addDebugInfo(`❌ 计算结果无效: v1=${v1}, v2=${v2}`);
+                        return;
+                    }
+    
+                    // 使用节流更新图表
+                    if (currentTime - AppState.lastRenderTime >= AppState.renderInterval) {
+                        UIManager.updateChartData(v2);
+                        AppState.lastRenderTime = currentTime;
+                    }
+                    
+                } catch (error) {
+                    UIManager.addDebugInfo(`❌ 解析错误: ${error.message}`);
+                    return;
+                }
+            }
+        };
+
+        const UIManager = {
+            init() {
+                console.log('界面管理模块初始化');
+                this.initializeChart();
+                this.updateStatus('未连接', false);
+                this.updateControlButtons('disconnected');
+                
+                // 添加初始调试信息
+                AppState.debugMessages.push('<div style="color: #6c757d; font-style: italic;">📱 系统已就绪，点击"启动连接"开始监测</div>');
+                this.updateDebugDisplay();
+            },
+            
+            initializeChart() {
+                const ctx = document.getElementById('velocityChart').getContext('2d');
+                AppState.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: '🚀 V2 速度',
+                            data: [],
+                            borderColor: '#4fc3f7',
+                            backgroundColor: 'rgba(79, 195, 247, 0.1)',
+                            borderWidth: 3,
+                            pointBackgroundColor: '#4fc3f7',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                labels: {
+                                    usePointStyle: true,
+                                    font: {
+                                        size: 14,
+                                        weight: '600'
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: '速度 (V2)',
+                                    font: {
+                                        size: 14,
+                                        weight: '600'
+                                    },
+                                    color: '#37474f'
+                                },
+                                grid: {
+                                    color: 'rgba(0,0,0,0.1)'
+                                },
+                                ticks: {
+                                    color: '#37474f'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: '时间',
+                                    font: {
+                                        size: 14,
+                                        weight: '600'
+                                    },
+                                    color: '#37474f'
+                                },
+                                grid: {
+                                    color: 'rgba(0,0,0,0.1)'
+                                },
+                                ticks: {
+                                    color: '#37474f'
+                                }
                             }
                         }
                     }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: '速度 (V2)',
-                            font: {
-                                size: 14,
-                                weight: '600'
-                            },
-                            color: '#37474f'
-                        },
-                        grid: {
-                            color: 'rgba(0,0,0,0.1)'
-                        },
-                        ticks: {
-                            color: '#37474f'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: '时间',
-                            font: {
-                                size: 14,
-                                weight: '600'
-                            },
-                            color: '#37474f'
-                        },
-                        grid: {
-                            color: 'rgba(0,0,0,0.1)'
-                        },
-                        ticks: {
-                            color: '#37474f'
-                        }
+                });
+            },
+            
+            updateControlButtons(state) {
+                const startBtn = document.getElementById('startButton');
+                const stopBtn = document.getElementById('stopButton');
+    
+                switch(state) {
+                    case 'connecting':
+                        startBtn.disabled = true;
+                        startBtn.innerHTML = '🔄 连接中...';
+                        stopBtn.disabled = false;
+                        break;
+                    case 'connected':
+                        startBtn.disabled = true;
+                        startBtn.innerHTML = '✅ 已连接';
+                        stopBtn.disabled = false;
+                        break;
+                    case 'disconnected':
+                        startBtn.disabled = false;
+                        startBtn.innerHTML = '▶️ 启动连接';
+                        stopBtn.disabled = true;
+                        break;
+                }
+            },
+            
+            updateStatus(message, isConnected) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.textContent = `WebSocket状态: ${message}`;
+                statusDiv.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+            },
+            
+            updateRecentLapsDisplay() {
+                const n = AppState.targetLaps;
+                document.getElementById('recentLapsDisplayCount').textContent = n;
+    
+                if (AppState.lapTimes.length < n) {
+                    document.getElementById('recentLapsDetails').innerHTML = '<div style="text-align: center; color: #6c757d; padding: 20px;">⏳ 等待更多圈数数据...</div>';
+                    return;
+                }
+    
+                let recentLapsHTML = '';
+                let bestTime = Infinity;
+                let bestIndex = -1;
+    
+                // 使用滑动窗口算法计算最佳组合
+                let currentSum = 0;
+                for (let i = 0; i < n; i++) {
+                    currentSum += AppState.lapTimes[i];
+                }
+                bestTime = currentSum;
+                let bestStartIndex = 0;
+                
+                for (let i = n; i < AppState.lapTimes.length; i++) {
+                    currentSum = currentSum - AppState.lapTimes[i - n] + AppState.lapTimes[i];
+                    if (currentSum < bestTime) {
+                        bestTime = currentSum;
+                        bestStartIndex = i - n + 1;
                     }
                 }
+                
+                const displayCount = Math.min(AppState.lapDisplayLimit, AppState.lapTimes.length - n + 1);
+                const displayStart = Math.max(0, AppState.lapTimes.length - n + 1 - displayCount);
+                
+                for (let i = displayStart; i <= AppState.lapTimes.length - n; i++) {
+                    let groupSum;
+                    if (i === bestStartIndex) {
+                        groupSum = bestTime;
+                    } else {
+                        groupSum = 0;
+                        for (let j = i; j < i + n; j++) {
+                            groupSum += AppState.lapTimes[j];
+                        }
+                    }
+                    
+                    const startLap = i + 1;
+                    const endLap = i + n;
+                    const itemClass = (i === bestStartIndex) ? 'recent-lap-item recent-lap-best' : 'recent-lap-item';
+            
+                    recentLapsHTML += `<div class="${itemClass}">第${startLap}-${endLap}圈: ${(groupSum/1000).toFixed(3)} s</div>`;
+                }
+                
+                document.getElementById('recentLapsDetails').innerHTML = recentLapsHTML;
+                const recentLapsDiv = document.getElementById('recentLapsDetails');
+                recentLapsDiv.scrollTop = recentLapsDiv.scrollHeight;
+            },
+            
+            updateLapInfo() {
+                document.getElementById('currentLap').textContent = AppState.lapCount;
+                document.getElementById('totalTime').textContent = (AppState.totalTime/1000).toFixed(3);
+    
+                // 显示最近的lapDisplayLimit圈详细信息
+                const displayDetails = AppState.lapDetails.slice(-AppState.lapDisplayLimit);
+                const lapDetailsDiv = document.getElementById('lapDetails');
+                lapDetailsDiv.innerHTML = displayDetails.map(
+                    detail => `<div class="lap-item">第${detail.lap}圈: ${detail.lapTime.toFixed(3)} ms</div>`
+                ).join('');
+    
+                lapDetailsDiv.scrollTop = lapDetailsDiv.scrollHeight;
+                this.updateRecentLapsDisplay();
+    
+                if (AppState.lapCount >= AppState.targetLaps) {
+                    document.getElementById('statsSection').style.display = 'block';
+                    this.updateRecentLapsStats();
+                } else {
+                    document.getElementById('statsSection').style.display = 'none';
+                }
+            },
+            
+            updateRecentLapsStats() {
+                if (AppState.lapTimes.length === 0) {
+                    document.getElementById('recentLapsTotal').textContent = '0.000';
+                    document.getElementById('bestLapsTime').textContent = '0.000';
+                    return;
+                }
+    
+                const n = AppState.targetLaps;
+                document.getElementById('recentLapsCount').textContent = n;
+                document.getElementById('bestLapsCount').textContent = n;
+    
+                // 获取最近n圈
+                const recentLaps = AppState.lapTimes.slice(-n);
+                const recentTotal = recentLaps.reduce((sum, time) => sum + time, 0);
+                document.getElementById('recentLapsTotal').textContent = (recentTotal/1000).toFixed(3);
+    
+                // 计算所有n圈组合中的最快时间
+                let bestTime = Infinity;
+                if (AppState.lapTimes.length >= n) {
+                    for (let i = 0; i <= AppState.lapTimes.length - n; i++) {
+                        const groupSum = AppState.lapTimes.slice(i, i + n).reduce((sum, time) => sum + time, 0);
+                        if (groupSum < bestTime) {
+                            bestTime = groupSum;
+                        }
+                    }
+                } else {
+                    bestTime = recentTotal;
+                }
+    
+                document.getElementById('bestLapsTime').textContent = bestTime === Infinity ? '0.000' : (bestTime/1000).toFixed(3);
+            },
+            
+            updateChartData(v2) {
+                const now = new Date().toLocaleTimeString();
+                AppState.chart.data.labels.push(now);
+                AppState.chart.data.datasets[0].data.push(v2);
+        
+                if (AppState.chart.data.labels.length > 20) {
+                    AppState.chart.data.labels.shift();
+                    AppState.chart.data.datasets[0].data.shift();
+                }
+                
+                AppState.chart.update({
+                    duration: 0,
+                    lazy: true
+                });
+                
+                this.addDebugInfo(`📊 图表已更新（节流模式），数据点数量: ${AppState.chart.data.labels.length}`);
+            },
+            
+            addDebugInfo(message) {
+                const time = new Date().toLocaleTimeString();
+                const formattedMessage = `<div>[${time}] ${message}</div>`;
+                const maxMessages = AppState.debugDisplayLimit * 2;
+                
+                if (AppState.debugMessages.length >= maxMessages) {
+                    AppState.debugMessages.shift();
+                }
+                
+                AppState.debugMessages.push(formattedMessage);
+                this.updateDebugDisplay();
+            },
+            
+            updateDebugDisplay() {
+                if (!AppState.showDebugInfo) return;
+    
+                const debugContentDiv = document.getElementById('debugContent');
+                const displayMessages = AppState.debugMessages.slice(-AppState.debugDisplayLimit);
+                debugContentDiv.innerHTML = displayMessages.join('');
+                debugContentDiv.scrollTop = debugContentDiv.scrollHeight;
+            },
+            
+            updateFooterYear() {
+                const currentYear = new Date().getFullYear();
+                const footerText = document.querySelector('.footer-bottom p');
+                if (footerText && currentYear !== 2025) {
+                    footerText.innerHTML = footerText.innerHTML.replace('2025', currentYear);
+                }
             }
+        };
+
+        const SettingsManager = {
+            init() {
+                console.log('设置管理模块初始化');
+                document.querySelector('.settings-button').addEventListener('click', () => this.open());
+                document.querySelector('.close-button').addEventListener('click', () => this.close());
+                
+                // 初始化设置控制
+                this.initializeSettings();
+                
+                // 初始设置调试信息显示状态
+                document.getElementById('debugInfo').style.display = AppState.showDebugInfo ? 'flex' : 'none';
+            },
+            
+            open() {
+                document.getElementById('settingsModal').style.display = 'block';
+                document.getElementById('settingLapNumber').value = AppState.targetLaps;
+                document.getElementById('settingLapDisplayLimit').value = AppState.lapDisplayLimit;
+                document.getElementById('settingDebugDisplayLimit').value = AppState.debugDisplayLimit;
+                document.getElementById('settingShowDebug').checked = AppState.showDebugInfo;
+                this.updateSettingDisplays();
+            },
+            
+            close() {
+                document.getElementById('settingsModal').style.display = 'none';
+            },
+            
+            updateSettingDisplays() {
+                document.getElementById('settingLapDisplayValue').textContent =
+                    document.getElementById('settingLapDisplayLimit').value + ' 圈';
+                document.getElementById('settingDebugDisplayValue').textContent =
+                    document.getElementById('settingDebugDisplayLimit').value + ' 条';
+            },
+            
+            initializeSettings() {
+                // 通用设置处理
+                const settingHandlers = {
+                    'settingLapNumber': value => {
+                        AppState.targetLaps = parseInt(value) || 3;
+                        this.resetLapData();
+                    },
+                    'settingLapDisplayLimit': value => {
+                        AppState.lapDisplayLimit = parseInt(value);
+                        UIManager.updateLapInfo();
+                    },
+                    'settingDebugDisplayLimit': value => {
+                        AppState.debugDisplayLimit = parseInt(value);
+                        UIManager.updateDebugDisplay();
+                    }
+                };
+                
+                Object.keys(settingHandlers).forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.addEventListener('input', function() {
+                            settingHandlers[id](this.value);
+                            SettingsManager.updateSettingDisplays();
+                        });
+                    }
+                });
+                
+                // 特殊处理 - 调试信息显示开关
+                document.getElementById('settingShowDebug').addEventListener('change', function() {
+                    AppState.showDebugInfo = this.checked;
+                    document.getElementById('debugInfo').style.display = AppState.showDebugInfo ? 'flex' : 'none';
+                });
+                
+                // 重置按钮事件
+                document.querySelector('.control-button[onclick*="resetLapData"]').addEventListener('click', () => {
+                    this.resetLapData();
+                    this.close();
+                });
+            },
+            
+            resetLapData() {
+                AppState.isFirstData = true;
+                AppState.lapCount = 0;
+                AppState.totalTime = 0;
+                AppState.lastDataTime = null;
+                AppState.lapDetails = [];
+                AppState.lapTimes = [];
+                document.getElementById('statsSection').style.display = 'none';
+                UIManager.updateLapInfo();
+                UIManager.addDebugInfo('🔄 数据已重置');
+            }
+        };
+
+        // ================ 初始化应用 ================
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('应用初始化');
+            
+            // 初始化所有模块
+            ConnectionManager.init();
+            SettingsManager.init();
+            UIManager.init();
+            
+            // 更新页脚年份
+            UIManager.updateFooterYear();
         });
-
-        // 初始化设置
-        initializeSettings();
-
-        // 初始设置调试信息显示状态
-        document.getElementById('debugInfo').style.display = showDebugInfo ? 'flex' : 'none';
-
-        // 初始化状态显示
-        updateStatus('未连接', false);
-
-        // 初始化调试信息
-        debugMessages.push('<div style="color: #6c757d; font-style: italic;">📱 系统已就绪，点击"启动连接"开始监测</div>');
-        updateDebugDisplay();
-
-        // 初始化按钮状态
-        updateControlButtons('disconnected');
-
-        // 更新footer年份
-        updateFooterYear();
-
-        // 更新footer年份函数
-        function updateFooterYear() {
-            const currentYear = new Date().getFullYear();
-            const footerText = document.querySelector('.footer-bottom p');
-            if (footerText && currentYear !== 2025) {
-                footerText.innerHTML = footerText.innerHTML.replace('2025', currentYear);
-            }
-        }
-
     </script>
 </body>
 </html>
