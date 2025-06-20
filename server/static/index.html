@@ -354,39 +354,31 @@
                 if (isFirstData) {
                     isFirstData = false;
                     lastDataTime = currentTime;
-                    lapCount = 1;
+                    addDebugInfo(`首次数据 t=${t}ms，仅用于初始化时间基准，不计入圈数`);
+                    return;  // ❗只初始化，不记为一圈
+                }
 
-                    const lapTime = t; // 第一圈只有测量值
-                    totalTime = lapTime;
-                    lapTimes.push(lapTime);
+                // 正常圈数记录逻辑
+                const interval = currentTime - lastDataTime;
+                lastDataTime = currentTime;
+                lapCount++;
 
-                    lapDetails.push({
-                        lap: lapCount,
-                        lapTime: lapTime
-                    });
+                const lapTime = calculateLapTime(interval, t);
+                totalTime += lapTime;
+                lapTimes.push(lapTime);
+                lapDetails.push({
+                    lap: lapCount,
+                    lapTime: lapTime
+                });
 
-                    // 保持lapDetails数组不会无限增长
-                    if (lapDetails.length > lapDisplayLimit * 2) {
-                        lapDetails = lapDetails.slice(-lapDisplayLimit);
-                    }
-                } else {
-                    const interval = currentTime - lastDataTime;
-                    lastDataTime = currentTime;
-                    lapCount++;
+                addDebugInfo(`第${lapCount}圈完成，用时: ${lapTime.toFixed(3)}ms`);
 
-                    const lapTime = calculateLapTime(interval, t);
-                    totalTime += lapTime;
-                    lapTimes.push(lapTime);
-
-                    lapDetails.push({
-                        lap: lapCount,
-                        lapTime: lapTime
-                    });
-
-                    addDebugInfo(`第${lapCount}圈完成，用时: ${lapTime.toFixed(3)}ms`);
+                if (lapDetails.length > lapDisplayLimit * 2) {
+                    lapDetails = lapDetails.slice(-lapDisplayLimit);
                 }
 
                 updateLapInfo();
+
 
                 const v1 = L / t;
                 const v2 = (v1 * R2) / R1;
