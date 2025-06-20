@@ -27,6 +27,226 @@
         .header {
             text-align: center;
             margin-bottom: 30px;
+            position: relative;
+        }
+
+        .settings-button {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(79, 195, 247, 0.3);
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+
+        .settings-button:hover {
+            transform: translateY(-2px) rotate(90deg);
+            box-shadow: 0 6px 20px rgba(79, 195, 247, 0.4);
+        }
+
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .settings-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            animation: slideIn 0.3s ease;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0f2f1;
+        }
+
+        .settings-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #37474f;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #78909c;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .close-button:hover {
+            background: #ffeb3b;
+            color: #37474f;
+            transform: rotate(90deg);
+        }
+
+        .setting-group {
+            margin-bottom: 25px;
+        }
+
+        .setting-label {
+            display: block;
+            font-weight: 600;
+            color: #546e7a;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .setting-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0f2f1;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+            background: white;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: #4fc3f7;
+            box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.1);
+        }
+
+        .setting-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #e0f2f1;
+            outline: none;
+            -webkit-appearance: none;
+            margin: 10px 0;
+        }
+
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+            cursor: pointer;
+            box-shadow: 0 3px 8px rgba(79, 195, 247, 0.4);
+        }
+
+        .slider-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5px;
+        }
+
+        .slider-value-display {
+            background: #4fc3f7;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 30px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(30px);
+        }
+
+        .toggle-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -60%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
         }
 
         .header h1 {
@@ -325,16 +545,23 @@
                 grid-template-columns: 1fr;
             }
 
-            .controls-grid {
-                grid-template-columns: 1fr;
-            }
-
             .stats-overview {
                 grid-template-columns: repeat(2, 1fr);
             }
 
             .stats-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .settings-content {
+                width: 95%;
+                padding: 20px;
+            }
+
+            .settings-button {
+                width: 45px;
+                height: 45px;
+                font-size: 1.1rem;
             }
         }
 
@@ -363,27 +590,49 @@
         <div class="header">
             <h1>🏎️ 速度监测系统</h1>
             <div id="status" class="status disconnected">WebSocket状态: 未连接</div>
+            <button class="settings-button" onclick="openSettings()">⚙️</button>
         </div>
 
-        <div class="card">
-            <div class="card-title">⚙️ 系统配置</div>
-            <div class="controls-grid">
-                <div class="control-group">
-                    <label for="lapNumber">🎯 目标圈数</label>
-                    <input type="number" id="lapNumber" value="3" min="1" max="100">
+        <!-- 设置模态窗口 -->
+        <div id="settingsModal" class="settings-modal">
+            <div class="settings-content">
+                <div class="settings-header">
+                    <div class="settings-title">⚙️ 系统设置</div>
+                    <button class="close-button" onclick="closeSettings()">✖️</button>
                 </div>
-                <div class="control-group">
-                    <label for="lapDisplayLimit">📋 详细信息显示</label>
-                    <div class="slider-container">
-                        <input type="range" id="lapDisplayLimit" min="50" max="2000" value="1000">
-                        <span class="slider-value" id="lapDisplayValue">1000 圈</span>
+
+                <div class="setting-group">
+                    <label class="setting-label" for="settingLapNumber">🎯 目标圈数</label>
+                    <input type="number" id="settingLapNumber" class="setting-input" value="3" min="1" max="100">
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">📋 详细信息显示数量</label>
+                    <input type="range" id="settingLapDisplayLimit" class="setting-slider" min="50" max="2000" value="1000">
+                    <div class="slider-info">
+                        <span>50圈</span>
+                        <span class="slider-value-display" id="settingLapDisplayValue">1000 圈</span>
+                        <span>2000圈</span>
                     </div>
                 </div>
-                <div class="control-group">
-                    <label for="debugDisplayLimit">🐛 调试信息显示</label>
-                    <div class="slider-container">
-                        <input type="range" id="debugDisplayLimit" min="50" max="2000" value="1000">
-                        <span class="slider-value" id="debugDisplayValue">1000 条</span>
+
+                <div class="setting-group">
+                    <label class="setting-label">🐛 调试信息显示数量</label>
+                    <input type="range" id="settingDebugDisplayLimit" class="setting-slider" min="50" max="2000" value="1000">
+                    <div class="slider-info">
+                        <span>50条</span>
+                        <span class="slider-value-display" id="settingDebugDisplayValue">1000 条</span>
+                        <span>2000条</span>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <div class="toggle-label">
+                        <label class="setting-label">🔍 显示调试信息</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="settingShowDebug" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -454,24 +703,74 @@
         let lapDisplayLimit = 1000; // 详细信息显示限制
         let debugDisplayLimit = 1000; // 调试信息显示限制
         let debugMessages = []; // 存储调试信息
+        let showDebugInfo = true; // 是否显示调试信息
 
-        // 初始化滑动条控制
-        function initializeSliders() {
-            const lapSlider = document.getElementById('lapDisplayLimit');
-            const debugSlider = document.getElementById('debugDisplayLimit');
-            const lapValue = document.getElementById('lapDisplayValue');
-            const debugValue = document.getElementById('debugDisplayValue');
+        // 设置相关函数
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'block';
+            // 同步当前设置到模态窗口
+            document.getElementById('settingLapNumber').value = targetLaps;
+            document.getElementById('settingLapDisplayLimit').value = lapDisplayLimit;
+            document.getElementById('settingDebugDisplayLimit').value = debugDisplayLimit;
+            document.getElementById('settingShowDebug').checked = showDebugInfo;
+            updateSettingDisplays();
+        }
 
-            lapSlider.addEventListener('input', function() {
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function updateSettingDisplays() {
+            document.getElementById('settingLapDisplayValue').textContent =
+                document.getElementById('settingLapDisplayLimit').value + ' 圈';
+            document.getElementById('settingDebugDisplayValue').textContent =
+                document.getElementById('settingDebugDisplayLimit').value + ' 条';
+        }
+
+        // 点击模态窗口外部关闭设置
+        window.onclick = function(event) {
+            const modal = document.getElementById('settingsModal');
+            if (event.target === modal) {
+                closeSettings();
+            }
+        }
+
+        // 初始化设置控制
+        function initializeSettings() {
+            // 目标圈数设置
+            document.getElementById('settingLapNumber').addEventListener('change', function(e) {
+                targetLaps = parseInt(e.target.value) || 3;
+                isFirstData = true;
+                lapCount = 0;
+                totalTime = 0;
+                lastDataTime = null;
+                lapDetails = [];
+                lapTimes = [];
+                debugMessages = [];
+                document.getElementById('statsSection').style.display = 'none';
+                updateLapInfo();
+                updateDebugDisplay();
+            });
+
+            // 详细信息显示数量设置
+            document.getElementById('settingLapDisplayLimit').addEventListener('input', function() {
                 lapDisplayLimit = parseInt(this.value);
-                lapValue.textContent = lapDisplayLimit + ' 圈';
+                updateSettingDisplays();
                 updateLapInfo(); // 重新更新显示
             });
 
-            debugSlider.addEventListener('input', function() {
+            // 调试信息显示数量设置
+            document.getElementById('settingDebugDisplayLimit').addEventListener('input', function() {
                 debugDisplayLimit = parseInt(this.value);
-                debugValue.textContent = debugDisplayLimit + ' 条';
+                updateSettingDisplays();
                 updateDebugDisplay(); // 重新更新调试信息显示
+            });
+
+            // 调试信息显示开关
+            document.getElementById('settingShowDebug').addEventListener('change', function() {
+                showDebugInfo = this.checked;
+                const debugDiv = document.getElementById('debugInfo');
+                debugDiv.style.display = showDebugInfo ? 'block' : 'none';
             });
         }
 
@@ -519,7 +818,7 @@
 
         function updateLapInfo() {
             document.getElementById('currentLap').textContent = lapCount;
-            document.getElementById('totalTime').textContent = (totalTime/1000).toFixed(3);
+            document.getElementById('totalTime').textContent = (totalTime/1000).toFixed(3) + ' s';
 
             // 显示最近的lapDisplayLimit圈详细信息 - 保持毫秒
             const displayDetails = lapDetails.slice(-lapDisplayLimit);
@@ -557,7 +856,7 @@
             // 获取最近n圈
             const recentLaps = lapTimes.slice(-n);
             const recentTotal = recentLaps.reduce((sum, time) => sum + time, 0);
-            document.getElementById('recentLapsTotal').textContent = (recentTotal/1000).toFixed(3);
+            document.getElementById('recentLapsTotal').textContent = (recentTotal/1000).toFixed(3) + ' s';
 
             // 计算所有n圈组合中的最快时间
             let bestTime = Infinity;
@@ -572,30 +871,18 @@
                 bestTime = recentTotal;
             }
 
-            document.getElementById('bestLapsTime').textContent = bestTime === Infinity ? '0.000' : (bestTime/1000).toFixed(3);
+            document.getElementById('bestLapsTime').textContent = bestTime === Infinity ? '0.000' : (bestTime/1000).toFixed(3) + ' s';
         }
 
         function updateDebugDisplay() {
+            if (!showDebugInfo) return;
+
             const debugDiv = document.getElementById('debugInfo');
             const displayMessages = debugMessages.slice(-debugDisplayLimit);
             debugDiv.innerHTML = '<div><strong>🐛 调试信息</strong></div>' +
                 displayMessages.join('');
             debugDiv.scrollTop = debugDiv.scrollHeight;
         }
-
-        document.getElementById('lapNumber').addEventListener('change', function(e) {
-            targetLaps = parseInt(e.target.value) || 3;
-            isFirstData = true;
-            lapCount = 0;
-            totalTime = 0;
-            lastDataTime = null;
-            lapDetails = [];
-            lapTimes = [];
-            debugMessages = [];
-            document.getElementById('statsSection').style.display = 'none';
-            updateLapInfo();
-            updateDebugDisplay();
-        });
 
         // 调试信息显示函数
         function addDebugInfo(message) {
@@ -693,8 +980,11 @@
             }
         });
 
-        // 初始化滑动条
-        initializeSliders();
+        // 初始化设置
+        initializeSettings();
+
+        // 初始设置调试信息显示状态
+        document.getElementById('debugInfo').style.display = showDebugInfo ? 'block' : 'none';
 
         // 初始化调试信息
         debugMessages.push('<div style="color: #6c757d; font-style: italic;">⏳ 等待WebSocket连接...</div>');
