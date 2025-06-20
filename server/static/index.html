@@ -41,7 +41,13 @@
             background: #e9ecef;
             border-radius: 5px;
         }
+        .details-split-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
         .lap-details-container {
+            flex: 1;
             max-height: 170px;
             overflow-y: auto;
             border: 1px solid #ccc;
@@ -50,6 +56,41 @@
             background: white;
             font-family: monospace;
             font-size: 13px;
+        }
+        .recent-laps-container {
+            flex: 1;
+            max-height: 170px;
+            overflow-y: auto;
+            border: 1px solid #007bff;
+            border-radius: 3px;
+            padding: 10px;
+            background: #f8f9fa;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .container-title {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 8px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .recent-laps-title {
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 8px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .recent-lap-item {
+            margin-bottom: 3px;
+            padding: 2px 5px;
+            border-radius: 2px;
+        }
+        .recent-lap-best {
+            background-color: #d4edda;
+            color: #155724;
+            font-weight: bold;
         }
         .input-group {
             margin: 10px 0;
@@ -101,15 +142,23 @@
             <span id="debugDisplayValue">1000</span> 条
         </div>
         <div>当前圈数: <span id="currentLap">0</span></div>
-        <div>总计时间: <span id="totalTime">0.000</span> ms</div>
-        <div>详细信息:
-            <div class="lap-details-container" id="lapDetails"></div>
+        <div>总计时间: <span id="totalTime">0.000</span> s</div>
+
+        <div class="details-split-container">
+            <div>
+                <div class="container-title">每圈详细时间</div>
+                <div class="lap-details-container" id="lapDetails"></div>
+            </div>
+            <div>
+                <div class="recent-laps-title">近<span id="recentLapsDisplayCount">3</span>圈组合时间</div>
+                <div class="recent-laps-container" id="recentLapsDetails"></div>
+            </div>
         </div>
     </div>
 
     <div class="stats-section" id="statsSection" style="display: none;">
-        <div>近<span id="recentLapsCount">3</span>圈总用时: <span id="recentLapsTotal">0.000</span> ms</div>
-        <div class="best-time">近<span id="bestLapsCount">3</span>圈最快时间: <span id="bestLapsTime">0.000</span> ms</div>
+        <div>近<span id="recentLapsCount">3</span>圈总用时: <span id="recentLapsTotal">0.000</span> s</div>
+        <div class="best-time">近<span id="bestLapsCount">3</span>圈最快时间: <span id="bestLapsTime">0.000</span> s</div>
     </div>
 
     <div class="chart-container">
@@ -164,11 +213,48 @@
             return interval + measurement;
         }
 
+        function updateRecentLapsDisplay() {
+            const n = targetLaps;
+            document.getElementById('recentLapsDisplayCount').textContent = n;
+
+            if (lapTimes.length < n) {
+                document.getElementById('recentLapsDetails').innerHTML = '<div>等待更多圈数数据...</div>';
+                return;
+            }
+
+            let recentLapsHTML = '';
+            let bestTime = Infinity;
+            let bestIndex = -1;
+
+            // 计算所有可能的n圈组合
+            for (let i = 0; i <= lapTimes.length - n; i++) {
+                const groupTimes = lapTimes.slice(i, i + n);
+                const groupSum = groupTimes.reduce((sum, time) => sum + time, 0);
+
+                if (groupSum < bestTime) {
+                    bestTime = groupSum;
+                    bestIndex = i;
+                }
+
+                const startLap = i + 1;
+                const endLap = i + n;
+                const itemClass = (groupSum === bestTime && bestIndex === i) ? 'recent-lap-item recent-lap-best' : 'recent-lap-item';
+
+                recentLapsHTML += `<div class="${itemClass}">第${startLap}-${endLap}圈: ${(groupSum/1000).toFixed(3)} s</div>`;
+            }
+
+            document.getElementById('recentLapsDetails').innerHTML = recentLapsHTML;
+
+            // 自动滚动到最新内容
+            const recentLapsDiv = document.getElementById('recentLapsDetails');
+            recentLapsDiv.scrollTop = recentLapsDiv.scrollHeight;
+        }
+
         function updateLapInfo() {
             document.getElementById('currentLap').textContent = lapCount;
-            document.getElementById('totalTime').textContent = totalTime.toFixed(3);
+            document.getElementById('totalTime').textContent = (totalTime/1000).toFixed(3);
 
-            // 显示最近的lapDisplayLimit圈详细信息
+            // 显示最近的lapDisplayLimit圈详细信息 - 保持毫秒
             const displayDetails = lapDetails.slice(-lapDisplayLimit);
             const lapDetailsDiv = document.getElementById('lapDetails');
             lapDetailsDiv.innerHTML = displayDetails.map(
@@ -177,6 +263,9 @@
 
             // 自动滚动到最新内容
             lapDetailsDiv.scrollTop = lapDetailsDiv.scrollHeight;
+
+            // 更新近n圈显示
+            updateRecentLapsDisplay();
 
             // 只有当圈数达到目标圈数时才显示统计信息
             if (lapCount >= targetLaps) {
@@ -201,7 +290,7 @@
             // 获取最近n圈
             const recentLaps = lapTimes.slice(-n);
             const recentTotal = recentLaps.reduce((sum, time) => sum + time, 0);
-            document.getElementById('recentLapsTotal').textContent = recentTotal.toFixed(3);
+            document.getElementById('recentLapsTotal').textContent = (recentTotal/1000).toFixed(3);
 
             // 计算所有n圈组合中的最快时间
             let bestTime = Infinity;
@@ -216,7 +305,7 @@
                 bestTime = recentTotal;
             }
 
-            document.getElementById('bestLapsTime').textContent = bestTime === Infinity ? '0.000' : bestTime.toFixed(3);
+            document.getElementById('bestLapsTime').textContent = bestTime === Infinity ? '0.000' : (bestTime/1000).toFixed(3);
         }
 
         function updateDebugDisplay() {
@@ -371,14 +460,13 @@
                     lapTime: lapTime
                 });
 
-                addDebugInfo(`第${lapCount}圈完成，用时: ${lapTime.toFixed(3)}ms`);
+                addDebugInfo(`第${lapCount}圈完成，用时: ${(lapTime/1000).toFixed(3)}s`);
 
                 if (lapDetails.length > lapDisplayLimit * 2) {
                     lapDetails = lapDetails.slice(-lapDisplayLimit);
                 }
 
                 updateLapInfo();
-
 
                 const v1 = L / t;
                 const v2 = (v1 * R2) / R1;
