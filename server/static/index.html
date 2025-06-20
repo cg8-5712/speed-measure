@@ -17,7 +17,7 @@
             border-radius: 5px;
             font-family: monospace;
             font-size: 12px;
-            max-height: 200px;
+            max-height: 180px;
             overflow-y: auto;
         }
         .status {
@@ -41,8 +41,44 @@
             background: #e9ecef;
             border-radius: 5px;
         }
+        .lap-details-container {
+            max-height: 170px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 10px;
+            background: white;
+            font-family: monospace;
+            font-size: 13px;
+        }
         .input-group {
             margin: 10px 0;
+        }
+        .stats-section {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 10px;
+            background: #d1ecf1;
+            border-radius: 5px;
+        }
+        .best-time {
+            color: #0c5460;
+            font-weight: bold;
+        }
+        .control-slider {
+            margin: 5px 0;
+        }
+        .control-slider label {
+            display: inline-block;
+            width: 150px;
+        }
+        .control-slider input[type="range"] {
+            width: 200px;
+            margin: 0 10px;
+        }
+        .control-slider span {
+            font-weight: bold;
+            color: #0066cc;
         }
     </style>
 </head>
@@ -54,9 +90,26 @@
             <label for="lapNumber">目标圈数: </label>
             <input type="number" id="lapNumber" value="3" min="1" max="100">
         </div>
+        <div class="control-slider">
+            <label for="lapDisplayLimit">详细信息显示: </label>
+            <input type="range" id="lapDisplayLimit" min="50" max="2000" value="1000">
+            <span id="lapDisplayValue">1000</span> 圈
+        </div>
+        <div class="control-slider">
+            <label for="debugDisplayLimit">调试信息显示: </label>
+            <input type="range" id="debugDisplayLimit" min="50" max="2000" value="1000">
+            <span id="debugDisplayValue">1000</span> 条
+        </div>
         <div>当前圈数: <span id="currentLap">0</span></div>
-        <div>总计时间: <span id="totalTime">0</span> ms</div>
-        <div>详细信息: <div id="lapDetails"></div></div>
+        <div>总计时间: <span id="totalTime">0.000</span> ms</div>
+        <div>详细信息:
+            <div class="lap-details-container" id="lapDetails"></div>
+        </div>
+    </div>
+
+    <div class="stats-section" id="statsSection" style="display: none;">
+        <div>近<span id="recentLapsCount">3</span>圈总用时: <span id="recentLapsTotal">0.000</span> ms</div>
+        <div class="best-time">近<span id="bestLapsCount">3</span>圈最快时间: <span id="bestLapsTime">0.000</span> ms</div>
     </div>
 
     <div class="chart-container">
@@ -64,8 +117,6 @@
     </div>
 
     <div class="debug-info" id="debugInfo">
-        <div><strong>调试信息:</strong></div>
-        <div>等待WebSocket连接...</div>
     </div>
 
     <script>
@@ -83,14 +134,97 @@
         let lastDataTime = null;
         let targetLaps = 3;
         let lapDetails = [];
-        let isTimingComplete = false;
+        let lapTimes = []; // 存储每圈的用时
+        let lapDisplayLimit = 1000; // 详细信息显示限制
+        let debugDisplayLimit = 1000; // 调试信息显示限制
+        let debugMessages = []; // 存储调试信息
+
+        // 初始化滑动条控制
+        function initializeSliders() {
+            const lapSlider = document.getElementById('lapDisplayLimit');
+            const debugSlider = document.getElementById('debugDisplayLimit');
+            const lapValue = document.getElementById('lapDisplayValue');
+            const debugValue = document.getElementById('debugDisplayValue');
+
+            lapSlider.addEventListener('input', function() {
+                lapDisplayLimit = parseInt(this.value);
+                lapValue.textContent = lapDisplayLimit;
+                updateLapInfo(); // 重新更新显示
+            });
+
+            debugSlider.addEventListener('input', function() {
+                debugDisplayLimit = parseInt(this.value);
+                debugValue.textContent = debugDisplayLimit;
+                updateDebugDisplay(); // 重新更新调试信息显示
+            });
+        }
+
+        function calculateLapTime(interval, measurement) {
+            // 每圈总用时 = 间隔时间 + 测量值
+            return interval + measurement;
+        }
 
         function updateLapInfo() {
             document.getElementById('currentLap').textContent = lapCount;
-            document.getElementById('totalTime').textContent = totalTime;
-            document.getElementById('lapDetails').innerHTML = lapDetails.map(
-                detail => `<div>第${detail.lap}圈: 间隔${detail.interval}ms, 测量值${detail.measurement}ms</div>`
+            document.getElementById('totalTime').textContent = totalTime.toFixed(3);
+
+            // 显示最近的lapDisplayLimit圈详细信息
+            const displayDetails = lapDetails.slice(-lapDisplayLimit);
+            const lapDetailsDiv = document.getElementById('lapDetails');
+            lapDetailsDiv.innerHTML = displayDetails.map(
+                detail => `<div>第${detail.lap}圈: ${detail.lapTime.toFixed(3)} ms</div>`
             ).join('');
+
+            // 自动滚动到最新内容
+            lapDetailsDiv.scrollTop = lapDetailsDiv.scrollHeight;
+
+            // 只有当圈数达到目标圈数时才显示统计信息
+            if (lapCount >= targetLaps) {
+                document.getElementById('statsSection').style.display = 'block';
+                updateRecentLapsStats();
+            } else {
+                document.getElementById('statsSection').style.display = 'none';
+            }
+        }
+
+        function updateRecentLapsStats() {
+            if (lapTimes.length === 0) {
+                document.getElementById('recentLapsTotal').textContent = '0.000';
+                document.getElementById('bestLapsTime').textContent = '0.000';
+                return;
+            }
+
+            const n = targetLaps;
+            document.getElementById('recentLapsCount').textContent = n;
+            document.getElementById('bestLapsCount').textContent = n;
+
+            // 获取最近n圈
+            const recentLaps = lapTimes.slice(-n);
+            const recentTotal = recentLaps.reduce((sum, time) => sum + time, 0);
+            document.getElementById('recentLapsTotal').textContent = recentTotal.toFixed(3);
+
+            // 计算所有n圈组合中的最快时间
+            let bestTime = Infinity;
+            if (lapTimes.length >= n) {
+                for (let i = 0; i <= lapTimes.length - n; i++) {
+                    const groupSum = lapTimes.slice(i, i + n).reduce((sum, time) => sum + time, 0);
+                    if (groupSum < bestTime) {
+                        bestTime = groupSum;
+                    }
+                }
+            } else {
+                bestTime = recentTotal;
+            }
+
+            document.getElementById('bestLapsTime').textContent = bestTime === Infinity ? '0.000' : bestTime.toFixed(3);
+        }
+
+        function updateDebugDisplay() {
+            const debugDiv = document.getElementById('debugInfo');
+            const displayMessages = debugMessages.slice(-debugDisplayLimit);
+            debugDiv.innerHTML = '<div><strong>调试信息:</strong></div>' +
+                displayMessages.join('');
+            debugDiv.scrollTop = debugDiv.scrollHeight;
         }
 
         document.getElementById('lapNumber').addEventListener('change', function(e) {
@@ -100,16 +234,25 @@
             totalTime = 0;
             lastDataTime = null;
             lapDetails = [];
-            isTimingComplete = false;
+            lapTimes = [];
+            debugMessages = [];
+            document.getElementById('statsSection').style.display = 'none';
             updateLapInfo();
+            updateDebugDisplay();
         });
 
         // 调试信息显示函数
         function addDebugInfo(message) {
-            const debugDiv = document.getElementById('debugInfo');
             const time = new Date().toLocaleTimeString();
-            debugDiv.innerHTML += `<div>[${time}] ${message}</div>`;
-            debugDiv.scrollTop = debugDiv.scrollHeight;
+            const formattedMessage = `<div>[${time}] ${message}</div>`;
+            debugMessages.push(formattedMessage);
+
+            // 保持debugMessages数组不会无限增长
+            if (debugMessages.length > debugDisplayLimit * 2) {
+                debugMessages = debugMessages.slice(-debugDisplayLimit);
+            }
+
+            updateDebugDisplay();
         }
 
         // 更新状态显示
@@ -160,6 +303,13 @@
             }
         });
 
+        // 初始化滑动条
+        initializeSliders();
+
+        // 初始化调试信息
+        debugMessages.push('<div>等待WebSocket连接...</div>');
+        updateDebugDisplay();
+
         // 连接WebSocket
         addDebugInfo('尝试连接WebSocket...');
         const ws = new WebSocket('ws://127.0.0.1:8080');
@@ -199,38 +349,41 @@
                     return;
                 }
 
-                if (isTimingComplete) {
-                    addDebugInfo('已完成计时，不再记录新的圈数');
-                    return;
-                }
-
                 const currentTime = Date.now();
-                
+
                 if (isFirstData) {
                     isFirstData = false;
                     lastDataTime = currentTime;
                     lapCount = 1;
-                    totalTime = t;
+
+                    const lapTime = t; // 第一圈只有测量值
+                    totalTime = lapTime;
+                    lapTimes.push(lapTime);
+
                     lapDetails.push({
                         lap: lapCount,
-                        interval: 0,
-                        measurement: t
+                        lapTime: lapTime
                     });
+
+                    // 保持lapDetails数组不会无限增长
+                    if (lapDetails.length > lapDisplayLimit * 2) {
+                        lapDetails = lapDetails.slice(-lapDisplayLimit);
+                    }
                 } else {
                     const interval = currentTime - lastDataTime;
                     lastDataTime = currentTime;
                     lapCount++;
-                    totalTime += interval + t;
+
+                    const lapTime = calculateLapTime(interval, t);
+                    totalTime += lapTime;
+                    lapTimes.push(lapTime);
+
                     lapDetails.push({
                         lap: lapCount,
-                        interval: interval,
-                        measurement: t
+                        lapTime: lapTime
                     });
 
-                    if (lapCount >= targetLaps) {
-                        isTimingComplete = true;
-                        addDebugInfo(`✅ 完成${targetLaps}圈计时！总时间: ${totalTime}ms`);
-                    }
+                    addDebugInfo(`第${lapCount}圈完成，用时: ${lapTime.toFixed(3)}ms`);
                 }
 
                 updateLapInfo();
@@ -238,7 +391,7 @@
                 const v1 = L / t;
                 const v2 = (v1 * R2) / R1;
 
-                addDebugInfo(`✅ 计算结果: t=${t}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
+                addDebugInfo(`✅ 计算结果: t=${t.toFixed(3)}, v1=${v1.toFixed(4)}, v2=${v2.toFixed(2)}`);
 
                 if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) {
                     addDebugInfo(`❌ 计算结果无效: v1=${v1}, v2=${v2}`);
