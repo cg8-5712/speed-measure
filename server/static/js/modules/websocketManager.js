@@ -42,8 +42,13 @@ export class WebSocketManager {
         this.shouldConnect = false;
 
         if (this.ws) {
-            this.ws.close();
-            this.ws = null;
+            try {
+                this.ws.close();
+            } catch (e) {
+                console.error ('关闭连接错误：', e);
+            } finally {
+                this.ws = null;
+            }
         }
 
         this.uiManager.updateControlButtons('disconnected');

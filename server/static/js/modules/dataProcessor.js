@@ -193,6 +193,7 @@ export class DataProcessor {
      */
     getRecentLapsStats() {
         const targetLaps = this.settingsManager.getSetting('targetLaps');
+        const n = targetLaps;
 
         if (this.lapTimes.length === 0) {
             return {
@@ -203,36 +204,25 @@ export class DataProcessor {
             };
         }
 
-        const hasEnoughData = this.lapTimes.length >= targetLaps;
+        const hasEnoughData = this.lapTimes.length >= n;
         let recentTotal = 0;
         let bestTime = Infinity;
         const recentCombinations = [];
 
         if (hasEnoughData) {
-            // 计算所有可能的n圈组合
-            for (let i = 0; i <= this.lapTimes.length - targetLaps; i++) {
-                const groupTimes = this.lapTimes.slice(i, i + targetLaps);
-                const groupSum = groupTimes.reduce((sum, time) => sum + time, 0);
-
-                recentCombinations.push({
-                    startLap: i + 1,
-                    endLap: i + targetLaps,
-                    totalTime: groupSum,
-                    isBest: false // 稍后会更新
-                });
-
-                if (groupSum < bestTime) {
-                    bestTime = groupSum;
+            let currentSum = this.lapTimes.slice(0, n).reduce((sum, time) => sum + time, 0);
+            bestTime = currentSum;
+            
+            // 滑动窗口算法核心
+            for (let i = n; i < this.lapTimes.length; i++) {
+                currentSum = currentSum - this.lapTimes[i - n] + this.lapTimes[i];
+                if (currentSum < bestTime) {
+                    bestTime = currentSum;
                 }
             }
 
-            // 标记最佳组合
-            recentCombinations.forEach(combo => {
-                combo.isBest = combo.totalTime === bestTime;
-            });
-
             // 获取最近n圈的总时间
-            const recentLaps = this.lapTimes.slice(-targetLaps);
+            const recentLaps = this.lapTimes.slice(-n);
             recentTotal = recentLaps.reduce((sum, time) => sum + time, 0);
         }
 
