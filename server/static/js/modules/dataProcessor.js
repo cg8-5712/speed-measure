@@ -212,27 +212,39 @@ export class DataProcessor {
         if (hasEnoughData) {
             let currentSum = this.lapTimes.slice(0, n).reduce((sum, time) => sum + time, 0);
             bestTime = currentSum;
-            
-            // 滑动窗口算法核心
+
+            recentCombinations.push({
+                startLap: 1,
+                endLap: n,
+                totalTime: currentSum,
+                isBest: false // Will be updated later
+            });
+
+            // Use sliding window to populate all combinations and find the best time
             for (let i = n; i < this.lapTimes.length; i++) {
                 currentSum = currentSum - this.lapTimes[i - n] + this.lapTimes[i];
+
+                recentCombinations.push({
+                    startLap: i - n + 2,
+                    endLap: i + 1,
+                    totalTime: currentSum,
+                    isBest: false // Will be updated later
+                });
+
                 if (currentSum < bestTime) {
                     bestTime = currentSum;
                 }
             }
 
-            // 获取最近n圈的总时间
+            // Mark the best combination(s)
+            recentCombinations.forEach(combo => {
+                combo.isBest = combo.totalTime === bestTime;
+            });
+
+            // Get total time for the most recent n laps
             const recentLaps = this.lapTimes.slice(-n);
             recentTotal = recentLaps.reduce((sum, time) => sum + time, 0);
         }
-
-        return {
-            recentTotal: recentTotal,
-            bestTime: bestTime === Infinity ? 0 : bestTime,
-            recentCombinations: recentCombinations,
-            hasEnoughData: hasEnoughData,
-            targetLaps: targetLaps
-        };
     }
 
     /**
