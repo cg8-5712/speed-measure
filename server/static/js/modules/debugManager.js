@@ -78,8 +78,7 @@ export class DebugManager {
 
         return `<div class="debug-message ${levelClass}" data-level="${level}" data-timestamp="${timestamp}">
             <span class="debug-time">[${timestamp}]</span>
-            <span class="debug-icon">${icon}</span>
-            <span class="debug-text">${this.escapeHtml(message)}</span>
+            <span class="debug-content"><span class="debug-icon">${icon}</span><span class="debug-text">${this.escapeHtml(message)}</span></span>
         </div>`;
     }
 
