@@ -6,7 +6,7 @@ from utils import WebSocketServer
 from dotenv import load_dotenv
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='')
 
 # Load environment variables from .env file
 ws_host = os.getenv('WS_HOST', '0.0.0.0')
