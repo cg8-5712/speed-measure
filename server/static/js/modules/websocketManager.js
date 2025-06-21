@@ -1,6 +1,7 @@
 /**
- * WebSocket连接管理器
+ * WebSocket连接管理器（更新版）
  * 负责WebSocket连接的建立、维护、重连和消息处理
+ * 支持双向通信：接收后端处理的数据，发送前端请求到后端
  */
 export class WebSocketManager {
     constructor(dataProcessor, uiManager, debugManager) {
@@ -18,6 +19,11 @@ export class WebSocketManager {
 
         // WebSocket服务器地址
         this.serverUrl = 'ws://127.0.0.1:8080';
+
+        // 监听数据处理器的发送事件
+        this.dataProcessor.on('sendToBackend', (message) => {
+            this.sendMessage(message);
+        });
     }
 
     /**
@@ -45,7 +51,7 @@ export class WebSocketManager {
             try {
                 this.ws.close();
             } catch (e) {
-                console.error ('关闭连接错误：', e);
+                console.error('关闭连接错误：', e);
             } finally {
                 this.ws = null;
             }
@@ -97,46 +103,26 @@ export class WebSocketManager {
         this.reconnectAttempts = 0;
         this.uiManager.updateStatus('已连接', true);
         this.uiManager.updateControlButtons('connected');
-        this.debugManager.addDebugInfo('✅ WebSocket连接成功');
+        this.debugManager.addDebugInfo('✅ WebSocket连接成功（后端数据处理模式）');
     }
 
     /**
-     * 处理接收到的消息
+     * 处理接收到的消息（来自后端的已处理数据）
      */
     handleMessage(event) {
         try {
-            this.debugManager.addDebugInfo(`接收到原始数据: "${event.data}" (类型: ${typeof event.data})`);
+            this.debugManager.addDebugInfo(`📥 接收到后端消息: "${event.data}"`);
 
             const cleanData = event.data.toString().trim();
-            this.debugManager.addDebugInfo(`清理后的数据: "${cleanData}"`);
-
             const jsonData = JSON.parse(cleanData);
-            this.debugManager.addDebugInfo(`解析的JSON对象: ${JSON.stringify(jsonData)}`);
 
-            if (!jsonData.data) {
-                this.debugManager.addDebugInfo(`❌ JSON对象中没有找到'data'字段`);
-                return;
-            }
+            this.debugManager.addDebugInfo(`📋 解析的后端数据: ${JSON.stringify(jsonData)}`);
 
-            const t = parseFloat(jsonData.data);
-            this.debugManager.addDebugInfo(`解析结果: t = ${t} (类型: ${typeof t})`);
-            this.debugManager.addDebugInfo(`来源: ${jsonData.from}, 时间戳: ${jsonData.timestamp}`);
-
-            if (isNaN(t) || !isFinite(t)) {
-                this.debugManager.addDebugInfo(`❌ 解析失败: t 不是有效数字`);
-                return;
-            }
-
-            if (t <= 0) {
-                this.debugManager.addDebugInfo(`❌ 无效数据: t 必须大于0，当前值: ${t}`);
-                return;
-            }
-
-            // 将数据传递给数据处理器
-            this.dataProcessor.processData(t, jsonData);
+            // 将后端处理好的数据传递给前端数据处理器
+            this.dataProcessor.processBackendData(jsonData);
 
         } catch (error) {
-            this.debugManager.addDebugInfo(`❌ 解析错误: ${error.message}`);
+            this.debugManager.addDebugInfo(`❌ 解析后端消息错误: ${error.message}`);
         }
     }
 
@@ -197,13 +183,14 @@ export class WebSocketManager {
     }
 
     /**
-     * 发送消息到WebSocket服务器
+     * 发送消息到WebSocket服务器（后端）
      */
     sendMessage(message) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             try {
-                this.ws.send(JSON.stringify(message));
-                this.debugManager.addDebugInfo(`📤 发送消息: ${JSON.stringify(message)}`);
+                const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+                this.ws.send(messageStr);
+                this.debugManager.addDebugInfo(`📤 发送消息到后端: ${messageStr}`);
                 return true;
             } catch (error) {
                 this.debugManager.addDebugInfo(`❌ 发送消息失败: ${error.message}`);
@@ -213,6 +200,44 @@ export class WebSocketManager {
             this.debugManager.addDebugInfo('❌ WebSocket未连接，无法发送消息');
             return false;
         }
+    }
+
+    /**
+     * 发送设置更新到后端
+     */
+    sendSettingUpdate(key, value) {
+        return this.sendMessage({
+            type: 'setting_update',
+            key: key,
+            value: value
+        });
+    }
+
+    /**
+     * 请求重置数据
+     */
+    requestDataReset() {
+        return this.sendMessage({
+            type: 'reset_data'
+        });
+    }
+
+    /**
+     * 请求导出数据
+     */
+    requestDataExport() {
+        return this.sendMessage({
+            type: 'export_data'
+        });
+    }
+
+    /**
+     * 请求统计数据
+     */
+    requestStats() {
+        return this.sendMessage({
+            type: 'get_stats'
+        });
     }
 
     /**
@@ -254,7 +279,8 @@ export class WebSocketManager {
             shouldConnect: this.shouldConnect,
             reconnectAttempts: this.reconnectAttempts,
             maxReconnectAttempts: this.maxReconnectAttempts,
-            reconnectInterval: this.reconnectInterval
+            reconnectInterval: this.reconnectInterval,
+            backendProcessing: true // 标识数据处理在后端
         };
     }
 

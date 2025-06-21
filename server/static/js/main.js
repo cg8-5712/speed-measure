@@ -1,4 +1,4 @@
-// 主模块 - 应用程序入口点
+// 主模块 - 应用程序入口点（更新版：支持后端数据处理）
 import { WebSocketManager } from './modules/websocketManager.js';
 import { SettingsManager } from './modules/settingsManager.js';
 import { DataProcessor } from './modules/dataProcessor.js';
@@ -7,11 +7,13 @@ import { UIManager } from './modules/uiManager.js';
 import { DebugManager } from './modules/debugManager.js';
 
 /**
- * 速度监测系统主应用类
+ * 速度监测系统主应用类（更新版）
+ * 数据处理逻辑已移至Python后端
  */
 class SpeedMonitorApp {
     constructor() {
         this.initializeManagers();
+        this.setupManagerConnections();
         this.bindEvents();
         this.initializeApp();
     }
@@ -29,7 +31,7 @@ class SpeedMonitorApp {
         // 创建UI管理器
         this.uiManager = new UIManager(this.debugManager);
 
-        // 创建数据处理器
+        // 创建数据处理器（简化版，主要负责UI更新）
         this.dataProcessor = new DataProcessor(
             this.settingsManager,
             this.uiManager,
@@ -39,12 +41,30 @@ class SpeedMonitorApp {
         // 创建图表管理器
         this.chartManager = new ChartManager(this.debugManager);
 
-        // 创建WebSocket管理器
+        // 创建WebSocket管理器（支持双向通信）
         this.webSocketManager = new WebSocketManager(
             this.dataProcessor,
             this.uiManager,
             this.debugManager
         );
+    }
+
+    /**
+     * 建立管理器之间的连接
+     */
+    setupManagerConnections() {
+        // 设置WebSocket管理器引用到设置管理器
+        this.settingsManager.setWebSocketManager(this.webSocketManager);
+
+        // 监听数据处理器的后端设置更新
+        this.dataProcessor.on('settingUpdateFromBackend', (data) => {
+            this.settingsManager.updateSettingFromBackend(data.key, data.value);
+        });
+
+        // 监听后端设置更新
+        this.dataProcessor.on('backendSettings', (settings) => {
+            this.settingsManager.receiveBackendSettings(settings);
+        });
     }
 
     /**
@@ -75,7 +95,7 @@ class SpeedMonitorApp {
         });
 
         document.getElementById('resetDataButton').addEventListener('click', () => {
-            this.dataProcessor.resetLapData();
+            this.settingsManager.resetLapData();
             this.settingsManager.closeSettings();
         });
 
@@ -92,10 +112,41 @@ class SpeedMonitorApp {
             this.chartManager.updateChart(data);
         });
 
+        // 数据重置事件
+        this.dataProcessor.on('dataReset', () => {
+            this.chartManager.clearChart();
+        });
+
         // 页面卸载时清理资源
         window.addEventListener('beforeunload', () => {
             this.cleanup();
         });
+
+        // 添加导出数据按钮事件（可选功能）
+        this.addExportDataButton();
+    }
+
+    /**
+     * 添加导出数据按钮（可选功能）
+     */
+    addExportDataButton() {
+        // 可以在设置面板中添加导出按钮
+        const exportButton = document.createElement('button');
+        exportButton.className = 'control-button';
+        exportButton.innerHTML = '📤 导出数据';
+        exportButton.style.width = '100%';
+        exportButton.style.marginTop = '10px';
+
+        exportButton.addEventListener('click', () => {
+            this.webSocketManager.requestDataExport();
+            this.settingsManager.closeSettings();
+        });
+
+        // 添加到设置面板
+        const settingsContent = document.querySelector('.settings-content');
+        if (settingsContent) {
+            settingsContent.appendChild(exportButton);
+        }
     }
 
     /**
@@ -113,11 +164,12 @@ class SpeedMonitorApp {
 
         // 添加启动信息
         this.debugManager.addDebugInfo('📱 系统已就绪，点击"启动连接"开始监测');
+        this.debugManager.addDebugInfo('🔄 数据处理逻辑已移至Python后端');
 
         // 更新footer年份
         this.updateFooterYear();
 
-        console.log('速度监测系统初始化完成');
+        console.log('速度监测系统初始化完成（后端数据处理模式）');
     }
 
     /**
@@ -129,6 +181,20 @@ class SpeedMonitorApp {
         if (footerText && currentYear !== 2025) {
             footerText.innerHTML = footerText.innerHTML.replace('2025', currentYear);
         }
+    }
+
+    /**
+     * 手动请求统计数据
+     */
+    requestStats() {
+        this.webSocketManager.requestStats();
+    }
+
+    /**
+     * 手动导出数据
+     */
+    exportData() {
+        this.webSocketManager.requestDataExport();
     }
 
     /**
@@ -150,14 +216,29 @@ class SpeedMonitorApp {
         return {
             version: '1.8.5',
             build: new Date().toISOString(),
+            dataProcessing: 'Backend (Python)',
+            frontendMode: 'UI Only',
             modules: [
-                'WebSocketManager',
-                'SettingsManager',
-                'DataProcessor',
+                'WebSocketManager (双向通信)',
+                'SettingsManager (后端同步)',
+                'DataProcessor (简化版)',
                 'ChartManager',
                 'UIManager',
                 'DebugManager'
             ]
+        };
+    }
+
+    /**
+     * 获取系统状态
+     */
+    getSystemStatus() {
+        return {
+            websocket: this.webSocketManager.getConnectionStats(),
+            settings: this.settingsManager.getSettingsSummary(),
+            debug: this.debugManager.getStats(),
+            chart: this.chartManager.getChartStats(),
+            ui: this.uiManager.getUIState()
         };
     }
 }
@@ -169,7 +250,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 在开发模式下暴露应用实例到控制台
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        console.log('Speed Monitor App initialized:', window.speedMonitorApp.getVersion());
+        console.log('Speed Monitor App initialized (Backend Processing Mode):', window.speedMonitorApp.getVersion());
+        console.log('System Status:', window.speedMonitorApp.getSystemStatus());
+
+        // 开发工具
+        window.speedMonitorDebug = {
+            requestStats: () => window.speedMonitorApp.requestStats(),
+            exportData: () => window.speedMonitorApp.exportData(),
+            getStatus: () => window.speedMonitorApp.getSystemStatus()
+        };
     }
 });
 

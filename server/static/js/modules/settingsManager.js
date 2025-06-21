@@ -1,6 +1,7 @@
 /**
- * 设置管理器
+ * 设置管理器（更新版）
  * 负责处理应用程序的所有设置和配置
+ * 设置变更会同步到后端
  */
 export class SettingsManager {
     constructor(debugManager) {
@@ -19,6 +20,16 @@ export class SettingsManager {
 
         // 设置变更回调
         this.callbacks = new Map();
+
+        // WebSocket管理器引用（稍后通过setWebSocketManager设置）
+        this.webSocketManager = null;
+    }
+
+    /**
+     * 设置WebSocket管理器引用
+     */
+    setWebSocketManager(webSocketManager) {
+        this.webSocketManager = webSocketManager;
     }
 
     /**
@@ -28,7 +39,7 @@ export class SettingsManager {
         this.loadSettings();
         this.setupEventListeners();
         this.updateSettingsUI();
-        this.debugManager.addDebugInfo('⚙️ 设置管理器已初始化');
+        this.debugManager.addDebugInfo('⚙️ 设置管理器已初始化（支持后端同步）');
     }
 
     /**
@@ -79,29 +90,36 @@ export class SettingsManager {
             this.updateSetting('showDebugInfo', e.target.checked);
         });
     }
-      // 重置圈数数据
+
+    /**
+     * 重置圈数数据（通过后端）
+     */
     resetLapData() {
-        // 重置所有圈数相关数据
-        // 在实际应用中，这里应该包含重置计数器、清除存储的数据等逻辑
-        
-        this.debugManager.addDebugInfo('🔄 数据已重置');
-        
-        // 触发回调通知其他模块数据已重置
-        this.triggerCallback('dataReset', null, null);
+        if (this.webSocketManager) {
+            this.webSocketManager.requestDataReset();
+            this.debugManager.addDebugInfo('📤 已请求后端重置数据');
+        } else {
+            this.debugManager.addDebugInfo('❌ WebSocket管理器未设置，无法重置数据');
+        }
     }
-    
-    // 打开设置面板
+
+    /**
+     * 打开设置面板
+     */
     openSettings() {
         document.getElementById('settingsModal').style.display = 'block';
         this.updateSettingsUI();
         this.debugManager.addDebugInfo('⚙️ 打开设置面板');
     }
-    
-    // 关闭设置面板
+
+    /**
+     * 关闭设置面板
+     */
     closeSettings() {
         document.getElementById('settingsModal').style.display = 'none';
         this.debugManager.addDebugInfo('⚙️ 关闭设置面板');
     }
+
     /**
      * 更新设置值
      */
@@ -112,10 +130,32 @@ export class SettingsManager {
         // 保存到本地存储
         this.saveSettings();
 
-        // 触发回调
+        // 同步到后端
+        if (this.webSocketManager) {
+            this.webSocketManager.sendSettingUpdate(key, value);
+            this.debugManager.addDebugInfo(`📤 设置已发送到后端: ${key} = ${value}`);
+        }
+
+        // 触发本地回调
         this.triggerCallback(key, value, oldValue);
 
         this.debugManager.addDebugInfo(`⚙️ 设置已更新: ${key} = ${value} (原值: ${oldValue})`);
+    }
+
+    /**
+     * 从后端更新设置（不触发回调，避免循环）
+     */
+    updateSettingFromBackend(key, value) {
+        const oldValue = this.settings[key];
+        this.settings[key] = value;
+
+        // 保存到本地存储
+        this.saveSettings();
+
+        // 更新UI
+        this.updateSettingsUI();
+
+        this.debugManager.addDebugInfo(`📥 从后端更新设置: ${key} = ${value} (原值: ${oldValue})`);
     }
 
     /**
@@ -139,6 +179,15 @@ export class SettingsManager {
         this.settings = { ...this.defaultSettings };
         this.saveSettings();
         this.updateSettingsUI();
+
+        // 发送所有设置到后端
+        if (this.webSocketManager) {
+            Object.entries(this.settings).forEach(([key, value]) => {
+                this.webSocketManager.sendSettingUpdate(key, value);
+            });
+            this.debugManager.addDebugInfo('📤 所有设置已重置并发送到后端');
+        }
+
         this.triggerCallback('reset', this.settings, null);
         this.debugManager.addDebugInfo('🔄 设置已重置为默认值');
     }
@@ -168,6 +217,7 @@ export class SettingsManager {
     saveSettings() {
         try {
             localStorage.setItem('speedMonitorSettings', JSON.stringify(this.settings));
+            localStorage.setItem('speedMonitorSettingsLastModified', new Date().toISOString());
             this.debugManager.addDebugInfo('💾 设置已保存到本地存储');
         } catch (error) {
             this.debugManager.addDebugInfo(`❌ 保存设置失败: ${error.message}`);
@@ -179,10 +229,23 @@ export class SettingsManager {
      */
     updateSettingsUI() {
         // 更新表单元素
-        document.getElementById('settingLapNumber').value = this.settings.targetLaps;
-        document.getElementById('settingLapDisplayLimit').value = this.settings.lapDisplayLimit;
-        document.getElementById('settingDebugDisplayLimit').value = this.settings.debugDisplayLimit;
-        document.getElementById('settingShowDebug').checked = this.settings.showDebugInfo;
+        const elements = {
+            'settingLapNumber': this.settings.targetLaps,
+            'settingLapDisplayLimit': this.settings.lapDisplayLimit,
+            'settingDebugDisplayLimit': this.settings.debugDisplayLimit,
+            'settingShowDebug': this.settings.showDebugInfo
+        };
+
+        Object.entries(elements).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = value;
+                } else {
+                    element.value = value;
+                }
+            }
+        });
 
         // 更新滑块显示
         this.updateSliderDisplay('settingLapDisplayValue', this.settings.lapDisplayLimit + ' 圈');
@@ -190,7 +253,9 @@ export class SettingsManager {
 
         // 更新调试信息显示状态
         const debugDiv = document.getElementById('debugInfo');
-        debugDiv.style.display = this.settings.showDebugInfo ? 'flex' : 'none';
+        if (debugDiv) {
+            debugDiv.style.display = this.settings.showDebugInfo ? 'flex' : 'none';
+        }
     }
 
     /**
@@ -201,23 +266,6 @@ export class SettingsManager {
         if (element) {
             element.textContent = value;
         }
-    }
-
-    /**
-     * 打开设置模态窗口
-     */
-    openSettings() {
-        document.getElementById('settingsModal').style.display = 'block';
-        this.updateSettingsUI();
-        this.debugManager.addDebugInfo('⚙️ 打开设置面板');
-    }
-
-    /**
-     * 关闭设置模态窗口
-     */
-    closeSettings() {
-        document.getElementById('settingsModal').style.display = 'none';
-        this.debugManager.addDebugInfo('⚙️ 关闭设置面板');
     }
 
     /**
@@ -306,8 +354,16 @@ export class SettingsManager {
                         this.settings = { ...this.defaultSettings, ...importData.settings };
                         this.saveSettings();
                         this.updateSettingsUI();
+
+                        // 发送所有设置到后端
+                        if (this.webSocketManager) {
+                            Object.entries(this.settings).forEach(([key, value]) => {
+                                this.webSocketManager.sendSettingUpdate(key, value);
+                            });
+                        }
+
                         this.triggerCallback('import', this.settings, null);
-                        this.debugManager.addDebugInfo('📥 设置已成功导入');
+                        this.debugManager.addDebugInfo('📥 设置已成功导入并同步到后端');
                         resolve(this.settings);
                     } else {
                         throw new Error('无效的设置文件格式');
@@ -329,6 +385,16 @@ export class SettingsManager {
     }
 
     /**
+     * 从后端接收的设置更新
+     */
+    receiveBackendSettings(backendSettings) {
+        this.settings = { ...this.defaultSettings, ...backendSettings };
+        this.saveSettings();
+        this.updateSettingsUI();
+        this.debugManager.addDebugInfo('📥 已接收并应用后端设置');
+    }
+
+    /**
      * 获取设置摘要信息
      */
     getSettingsSummary() {
@@ -337,7 +403,8 @@ export class SettingsManager {
             modifiedSettings: Object.keys(this.settings).filter(key =>
                 this.settings[key] !== this.defaultSettings[key]
             ),
-            lastModified: localStorage.getItem('speedMonitorSettingsLastModified') || 'Unknown'
+            lastModified: localStorage.getItem('speedMonitorSettingsLastModified') || 'Unknown',
+            backendSyncEnabled: !!this.webSocketManager
         };
     }
 }
