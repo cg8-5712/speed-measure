@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.speedMonitorApp = new SpeedMonitorApp();
 
     // 在开发模式下暴露应用实例到控制台
-    if (process?.env?.NODE_ENV === 'development') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         console.log('Speed Monitor App initialized:', window.speedMonitorApp.getVersion());
     }
 });
