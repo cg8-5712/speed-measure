@@ -1,5 +1,5 @@
 /**
- * WebSocket连接管理器（更新版）
+ * WebSocket连接管理器（删除导出功能）
  * 负责WebSocket连接的建立、维护、重连和消息处理
  * 支持双向通信：接收后端处理的数据，发送前端请求到后端
  */
@@ -219,15 +219,6 @@ export class WebSocketManager {
     requestDataReset() {
         return this.sendMessage({
             type: 'reset_data'
-        });
-    }
-
-    /**
-     * 请求导出数据
-     */
-    requestDataExport() {
-        return this.sendMessage({
-            type: 'export_data'
         });
     }
 

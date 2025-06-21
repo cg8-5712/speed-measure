@@ -1,4 +1,4 @@
-// 主模块 - 应用程序入口点（更新版：支持后端数据处理）
+// 主模块 - 应用程序入口点（删除导出功能）
 import { WebSocketManager } from './modules/websocketManager.js';
 import { SettingsManager } from './modules/settingsManager.js';
 import { DataProcessor } from './modules/dataProcessor.js';
@@ -7,7 +7,7 @@ import { UIManager } from './modules/uiManager.js';
 import { DebugManager } from './modules/debugManager.js';
 
 /**
- * 速度监测系统主应用类（更新版）
+ * 速度监测系统主应用类（已删除导出功能）
  * 数据处理逻辑已移至Python后端
  */
 class SpeedMonitorApp {
@@ -121,32 +121,6 @@ class SpeedMonitorApp {
         window.addEventListener('beforeunload', () => {
             this.cleanup();
         });
-
-        // 添加导出数据按钮事件（可选功能）
-        this.addExportDataButton();
-    }
-
-    /**
-     * 添加导出数据按钮（可选功能）
-     */
-    addExportDataButton() {
-        // 可以在设置面板中添加导出按钮
-        const exportButton = document.createElement('button');
-        exportButton.className = 'control-button';
-        exportButton.innerHTML = '📤 导出数据';
-        exportButton.style.width = '100%';
-        exportButton.style.marginTop = '10px';
-
-        exportButton.addEventListener('click', () => {
-            this.webSocketManager.requestDataExport();
-            this.settingsManager.closeSettings();
-        });
-
-        // 添加到设置面板
-        const settingsContent = document.querySelector('.settings-content');
-        if (settingsContent) {
-            settingsContent.appendChild(exportButton);
-        }
     }
 
     /**
@@ -165,11 +139,12 @@ class SpeedMonitorApp {
         // 添加启动信息
         this.debugManager.addDebugInfo('📱 系统已就绪，点击"启动连接"开始监测');
         this.debugManager.addDebugInfo('🔄 数据处理逻辑已移至Python后端');
+        this.debugManager.addDebugInfo('❌ 导出功能已删除');
 
         // 更新footer年份
         this.updateFooterYear();
 
-        console.log('速度监测系统初始化完成（后端数据处理模式）');
+        console.log('速度监测系统初始化完成（后端数据处理模式，已删除导出功能）');
     }
 
     /**
@@ -188,13 +163,6 @@ class SpeedMonitorApp {
      */
     requestStats() {
         this.webSocketManager.requestStats();
-    }
-
-    /**
-     * 手动导出数据
-     */
-    exportData() {
-        this.webSocketManager.requestDataExport();
     }
 
     /**
@@ -218,6 +186,7 @@ class SpeedMonitorApp {
             build: new Date().toISOString(),
             dataProcessing: 'Backend (Python)',
             frontendMode: 'UI Only',
+            exportFeature: 'Removed',
             modules: [
                 'WebSocketManager (双向通信)',
                 'SettingsManager (后端同步)',
@@ -250,13 +219,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 在开发模式下暴露应用实例到控制台
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        console.log('Speed Monitor App initialized (Backend Processing Mode):', window.speedMonitorApp.getVersion());
+        console.log('Speed Monitor App initialized (Backend Processing Mode, Export Removed):', window.speedMonitorApp.getVersion());
         console.log('System Status:', window.speedMonitorApp.getSystemStatus());
 
         // 开发工具
         window.speedMonitorDebug = {
             requestStats: () => window.speedMonitorApp.requestStats(),
-            exportData: () => window.speedMonitorApp.exportData(),
             getStatus: () => window.speedMonitorApp.getSystemStatus()
         };
     }

@@ -1,6 +1,5 @@
 """
-后端数据处理器（增强调试版）
-解决数据字段缺失问题
+后端数据处理器（删除导出功能）
 """
 import time
 import json
@@ -8,6 +7,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 import threading
 import traceback
+import sys
+import gc
 
 
 class DataProcessor:
@@ -101,6 +102,31 @@ class DataProcessor:
             self.lap_times = []
             self.velocity_data = []
 
+    def reset_lap_data_only(self):
+        """仅重置圈数据，保持数据接收状态"""
+        with self.lock:
+            # 保存当前的数据接收状态
+            preserve_first_data = self.is_first_data
+            preserve_last_time = self.last_data_time
+
+            # 重置圈数据
+            self.lap_count = 0
+            self.total_time = 0.0
+            self.lap_details = []
+            self.lap_times = []
+            self.velocity_data = []
+
+            # 如果已经在正常接收数据（不是首次），保持这个状态
+            if not preserve_first_data and preserve_last_time is not None:
+                self.is_first_data = False
+                self.last_data_time = preserve_last_time
+                print("🔄 仅重置圈数据，保持数据接收状态")
+            else:
+                # 如果还没开始接收数据，完全重置
+                self.is_first_data = True
+                self.last_data_time = None
+                print("🔄 完全重置数据接收状态")
+
     def process_udp_data(self, udp_packet: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         处理UDP数据包
@@ -128,6 +154,8 @@ class DataProcessor:
                 return None
 
             with self.lock:
+                print(f"🔍 Debug: 当前状态 - is_first_data: {self.is_first_data}, last_data_time: {self.last_data_time}")
+
                 # 处理首次数据
                 if self.is_first_data:
                     return self._handle_first_data(t, current_time, udp_packet)
@@ -240,7 +268,6 @@ class DataProcessor:
             print(f"🔍 Debug: - totalTime: {response_data['totalTime']}")
             print(f"🔍 Debug: - lapTime: {response_data['lapTime']}")
             print(f"🔍 Debug: - showStatsSection: {response_data['showStatsSection']}")
-            print(f"🔍 Debug: - 完整数据结构: {json.dumps(response_data, indent=2, default=str)}")
 
             return response_data
 
@@ -402,10 +429,10 @@ class DataProcessor:
             }
 
     def reset_lap_data(self) -> Dict[str, Any]:
-        """重置圈数据"""
+        """重置圈数据（用户主动重置时使用）"""
         try:
-            self.reset_variables()
-            print('🔄 数据已重置')
+            print('🔄 用户主动重置所有数据')
+            self.reset_variables()  # 完全重置，包括首次数据标志
 
             response = {
                 'type': 'data_reset',
@@ -446,14 +473,16 @@ class DataProcessor:
 
             print(f"⚙️ 设置已更新: {normalized_key} = {self.settings[normalized_key]} (原值: {old_value})")
 
-            # 如果是目标圈数变更，重置数据
+            # 🔧 修复bug：目标圈数变更时，仅重置圈数据，不影响数据接收状态
             if normalized_key == 'targetLaps':
-                self.reset_lap_data()
+                print("🔧 目标圈数已变更，仅重置圈数据（保持数据接收状态）")
+                self.reset_lap_data_only()  # 使用新的方法，不会破坏数据接收流程
 
             return True
 
         except Exception as e:
             print(f"❌ 更新设置异常: {e}")
+            print(f"❌ 异常详情: {traceback.format_exc()}")
             return False
 
     def get_setting(self, key: str) -> Any:
@@ -492,25 +521,27 @@ class DataProcessor:
             print(f"❌ 获取统计摘要异常: {e}")
             return None
 
-    def export_data(self) -> Dict[str, Any]:
-        """导出数据"""
+    def get_memory_usage(self) -> Dict[str, Any]:
+        """获取内存使用情况"""
         try:
-            with self.lock:
-                export_data = {
-                    'timestamp': datetime.now().isoformat(),
-                    'version': '1.8.5',
-                    'constants': self.constants,
-                    'stats': self.get_stats_summary(),
-                    'lapDetails': [detail.copy() for detail in self.lap_details],
-                    'velocityData': [data.copy() for data in self.velocity_data if data],
-                    'settings': self.get_all_settings()
-                }
+            import psutil
+            import os
 
-                print('📤 数据已导出')
-                return export_data
-        except Exception as e:
-            print(f"❌ 导出数据异常: {e}")
+            process = psutil.Process(os.getpid())
+            memory_info = process.memory_info()
+
             return {
-                'timestamp': datetime.now().isoformat(),
-                'error': f'导出数据异常: {str(e)}'
+                'rss_mb': round(memory_info.rss / 1024 / 1024, 2),
+                'vms_mb': round(memory_info.vms / 1024 / 1024, 2),
+                'cpu_percent': process.cpu_percent(),
+                'lap_details_count': len(self.lap_details),
+                'velocity_data_count': len(self.velocity_data)
             }
+        except ImportError:
+            return {
+                'lap_details_count': len(self.lap_details),
+                'velocity_data_count': len(self.velocity_data),
+                'message': 'psutil not available for detailed memory stats'
+            }
+        except Exception as e:
+            return {'error': str(e)}

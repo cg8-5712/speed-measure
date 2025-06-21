@@ -77,14 +77,6 @@ def stats_api():
         return jsonify({'message': '暂无统计数据'})
 
 
-@app.route('/api/export')
-def export_api():
-    """导出数据API端点"""
-    data_processor = ws_server.get_data_processor()
-    export_data = data_processor.export_data()
-    return jsonify(export_data)
-
-
 @app.route('/api/reset', methods=['POST'])
 def reset_api():
     """重置数据API端点"""
@@ -100,7 +92,8 @@ def status_api():
         'websocket_clients': len(ws_server.clients),
         'server_running': True,
         'version': '1.8.5',
-        'data_processor_active': True
+        'data_processor_active': True,
+        'export_feature': 'Removed'
     })
 
 
@@ -129,5 +122,6 @@ if __name__ == '__main__':
     print(f"访问 http://{flask_host}:{flask_port} 查看实时数据")
     print(f"UDP服务器: {udp_host}:{udp_port}")
     print(f"WebSocket服务器: {ws_host}:{ws_port}")
+    print(f"❌ 导出功能已删除")
 
     app.run(host=flask_host, port=flask_port, debug=False)
