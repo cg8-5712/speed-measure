@@ -2,7 +2,7 @@ from flask import Flask, render_template, send_from_directory
 import threading
 import asyncio
 from utils import UDPServer
-from websocket_server import WebSocketServer
+from utils import WebSocketServer
 from dotenv import load_dotenv
 import os
 
