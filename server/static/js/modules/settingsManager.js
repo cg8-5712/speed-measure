@@ -58,6 +58,11 @@ export class SettingsManager {
         document.getElementById('settingShowDebug').addEventListener('change', (e) => {
             this.updateSetting('showDebugInfo', e.target.checked);
         });
+
+         document.getElementById('resetDataButton').addEventListener('click', () => {
+            this.resetLapData();
+            this.closeSettings();
+        });
     }
 
     /**
