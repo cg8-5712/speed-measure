@@ -35,6 +35,26 @@ export class SettingsManager {
      * 设置事件监听器
      */
     setupEventListeners() {
+        // 系统按钮控制监听
+        document.getElementById('settingsButton').addEventListener('click', () => {
+            this.openSettings();
+        });
+
+        document.getElementById('closeSettingsButton').addEventListener('click', () => {
+            this.closeSettings();
+        });
+
+        document.getElementById('resetDataButton').addEventListener('click', () => {
+            this.resetLapData();
+            this.closeSettings();
+        });
+
+        // 页脚设置链接
+        document.getElementById('openSettingsLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.openSettings();
+        });
+
         // 目标圈数设置
         document.getElementById('settingLapNumber').addEventListener('change', (e) => {
             this.updateSetting('targetLaps', parseInt(e.target.value) || 3);
@@ -58,23 +78,6 @@ export class SettingsManager {
         document.getElementById('settingShowDebug').addEventListener('change', (e) => {
             this.updateSetting('showDebugInfo', e.target.checked);
         });
-
-        // 重置按钮事件监听
-         document.getElementById('resetDataButton').addEventListener('click', () => {
-            this.resetLapData();
-            this.closeSettings();
-        });
-
-         // 设置按钮事件监听
-        document.getElementById('settingsButton').addEventListener('click', () => {
-            this.openSettings();
-        });
-        
-        // 关闭按钮事件监听
-        document.getElementById('closeSettingsButton').addEventListener('click', () => {
-            this.closeSettings();
-        });
-        
     }
       // 重置圈数数据
     resetLapData() {
