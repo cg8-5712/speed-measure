@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>速度监测系统 - 重构版</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>🏎️ 速度监测系统 v2.0</h1>
+            <div class="status-section">
+                <div id="connection-status" class="status disconnected">
+                    WebSocket: 未连接
+                </div>
+                <div class="controls">
+                    <button id="start-btn" class="btn btn-primary">开始监测</button>
+                    <button id="stop-btn" class="btn btn-secondary" disabled>停止监测</button>
+                    <button id="reset-btn" class="btn btn-warning">重置数据</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 数据展示 -->
+        <main class="main-content">
+            <!-- 统计卡片 -->
+            <div class="stats-cards">
+                <div class="card">
+                    <h3>当前圈数</h3>
+                    <div id="current-lap" class="stat-value">0</div>
+                </div>
+                <div class="card">
+                    <h3>总用时</h3>
+                    <div id="total-time" class="stat-value">0.000 s</div>
+                </div>
+                <div class="card">
+                    <h3>最新速度</h3>
+                    <div id="current-speed" class="stat-value">0.00 m/s</div>
+                </div>
+                <div class="card">
+                    <h3>最快圈速</h3>
+                    <div id="best-lap" class="stat-value">0.000 s</div>
+                </div>
+            </div>
+
+            <!-- 图表区域 -->
+            <div class="chart-section">
+                <h3>速度变化图表</h3>
+                <canvas id="speed-chart"></canvas>
+            </div>
+
+            <!-- 圈速详情 -->
+            <div class="lap-details">
+                <h3>圈速详情</h3>
+                <div id="lap-list" class="lap-list">
+                    <div class="no-data">暂无数据</div>
+                </div>
+            </div>
+
+            <!-- 调试信息 -->
+            <div class="debug-section">
+                <h3>调试信息</h3>
+                <div id="debug-log" class="debug-log"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
