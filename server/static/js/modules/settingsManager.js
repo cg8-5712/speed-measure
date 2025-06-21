@@ -59,12 +59,46 @@ export class SettingsManager {
             this.updateSetting('showDebugInfo', e.target.checked);
         });
 
+        // 重置按钮事件监听
          document.getElementById('resetDataButton').addEventListener('click', () => {
             this.resetLapData();
             this.closeSettings();
         });
-    }
 
+         // 设置按钮事件监听
+        document.getElementById('settingsButton').addEventListener('click', () => {
+            this.openSettings();
+        });
+        
+        // 关闭按钮事件监听
+        document.getElementById('closeSettingsButton').addEventListener('click', () => {
+            this.closeSettings();
+        });
+        
+    }
+      // 重置圈数数据
+    resetLapData() {
+        // 重置所有圈数相关数据
+        // 在实际应用中，这里应该包含重置计数器、清除存储的数据等逻辑
+        
+        this.debugManager.addDebugInfo('🔄 数据已重置');
+        
+        // 触发回调通知其他模块数据已重置
+        this.triggerCallback('dataReset', null, null);
+    }
+    
+    // 打开设置面板
+    openSettings() {
+        document.getElementById('settingsModal').style.display = 'block';
+        this.updateSettingsUI();
+        this.debugManager.addDebugInfo('⚙️ 打开设置面板');
+    }
+    
+    // 关闭设置面板
+    closeSettings() {
+        document.getElementById('settingsModal').style.display = 'none';
+        this.debugManager.addDebugInfo('⚙️ 关闭设置面板');
+    }
     /**
      * 更新设置值
      */
