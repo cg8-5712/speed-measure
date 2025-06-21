@@ -32,10 +32,23 @@ export class DebugManager {
     }
 
     /**
+     * 格式化时间戳为 hh:mm:ss.ms 格式
+     */
+    formatTimestamp() {
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const seconds = now.getSeconds().toString().padStart(2, '0');
+        const milliseconds = now.getMilliseconds().toString().padStart(3, '0');
+
+        return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+    }
+
+    /**
      * 添加调试信息
      */
     addDebugInfo(message, level = 'info') {
-        const timestamp = new Date().toLocaleTimeString();
+        const timestamp = this.formatTimestamp();
         const formattedMessage = this.formatMessage(message, level, timestamp);
 
         // 添加到消息数组
@@ -77,8 +90,12 @@ export class DebugManager {
         const levelClass = `debug-${level}`;
 
         return `<div class="debug-message ${levelClass}" data-level="${level}" data-timestamp="${timestamp}">
-            <span class="debug-time">[${timestamp}]</span>
-            <span class="debug-content"><span class="debug-icon">${icon}</span><span class="debug-text">${this.escapeHtml(message)}</span></span>
+            <span class="debug-content">
+                <span class="debug-time">${timestamp}</span>
+                <div class="debug-body">
+                    <span class="debug-icon">${icon}</span><span class="debug-text">${this.escapeHtml(message)}</span>
+                </div>
+            </span>
         </div>`;
     }
 
@@ -196,14 +213,21 @@ export class DebugManager {
         style.id = 'debug-manager-styles';
         style.textContent = `
             .debug-message {
-                padding: 2px 0;
-                border-bottom: 1px solid rgba(224, 242, 241, 0.3);
-                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                padding: 6px 0;
+                border-bottom: 1px solid rgba(224, 242, 241, 0.2);
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Consolas', monospace;
                 font-size: 0.85rem;
                 line-height: 1.4;
                 display: flex;
                 align-items: flex-start;
-                gap: 8px;
+                gap: 16px;
+                transition: background-color 0.15s ease;
+                margin-left: 8px;
+                padding-left: 8px;
+            }
+            
+            .debug-message:hover {
+                background-color: rgba(224, 242, 241, 0.05);
             }
             
             .debug-message:last-child {
@@ -211,15 +235,38 @@ export class DebugManager {
             }
             
             .debug-time {
-                color: #78909c;
-                font-size: 0.8rem;
+                color: #546e7a;
+                font-size: 0.78rem;
+                font-weight: 600;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Consolas', monospace;
                 flex-shrink: 0;
-                min-width: 75px;
+                min-width: 95px;
+                background: linear-gradient(135deg, rgba(96, 125, 139, 0.08), rgba(69, 90, 100, 0.12));
+                padding: 2px 6px;
+                border-radius: 4px;
+                border: 1px solid rgba(96, 125, 139, 0.15);
+                text-align: center;
+                letter-spacing: 0.3px;
+                position: relative;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                margin-top: 1px;
+                align-self: flex-start;
+            }
+            
+            .debug-time::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 1px;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
             }
             
             .debug-icon {
                 flex-shrink: 0;
                 font-size: 0.9rem;
+                margin-right: 4px;
             }
             
             .debug-text {
@@ -235,20 +282,32 @@ export class DebugManager {
                 color: #607d8b;
             }
             
+            .debug-debug .debug-time {
+                color: #78909c;
+                background: linear-gradient(135deg, rgba(120, 144, 156, 0.06), rgba(96, 125, 139, 0.1));
+                border-color: rgba(120, 144, 156, 0.12);
+            }
+            
             .debug-info .debug-text {
                 color: #37474f;
             }
             
             .debug-warn {
-                background: rgba(255, 193, 7, 0.1);
+                background: rgba(255, 193, 7, 0.08);
             }
             
             .debug-warn .debug-text {
                 color: #f57c00;
             }
             
+            .debug-warn .debug-time {
+                color: #ef6c00;
+                background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(245, 124, 0, 0.15));
+                border-color: rgba(255, 193, 7, 0.25);
+            }
+            
             .debug-error {
-                background: rgba(244, 67, 54, 0.1);
+                background: rgba(244, 67, 54, 0.08);
             }
             
             .debug-error .debug-text {
@@ -256,12 +315,25 @@ export class DebugManager {
                 font-weight: 600;
             }
             
+            .debug-error .debug-time {
+                color: #c62828;
+                background: linear-gradient(135deg, rgba(244, 67, 54, 0.12), rgba(211, 47, 47, 0.18));
+                border-color: rgba(244, 67, 54, 0.3);
+                font-weight: 700;
+            }
+            
             .debug-success {
-                background: rgba(76, 175, 80, 0.1);
+                background: rgba(76, 175, 80, 0.08);
             }
             
             .debug-success .debug-text {
                 color: #388e3c;
+            }
+            
+            .debug-success .debug-time {
+                color: #2e7d32;
+                background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(56, 142, 60, 0.15));
+                border-color: rgba(76, 175, 80, 0.25);
             }
         `;
 
