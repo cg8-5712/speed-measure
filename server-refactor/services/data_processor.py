@@ -32,8 +32,8 @@ class DataProcessor:
         """处理UDP数据"""
         try:
             # 解析时间戳
-            timestamp_ms = float(raw_data.strip())
-            current_time = time.time() * 1000  # 当前时间戳(毫秒)
+            timestamp_ms = float(raw_data.strip())      # in milliseconds
+            current_time = time.time_ns() // 1_000_000  # 当前时间戳(毫秒)
             
             logger.info("收到UDP数据: %s ms from %s", timestamp_ms, addr)
             
@@ -78,7 +78,7 @@ class DataProcessor:
         self.lap_times.append(lap_time)
         
         # 计算速度
-        speed = self._calculate_speed(lap_time)
+        speed = self._calculate_speed(timestamp_ms)
         
         logger.info("圈数: %d, 圈用时: %.3f秒, 速度: %.2f", 
                    self.lap_count, lap_time, speed)
@@ -104,19 +104,28 @@ class DataProcessor:
         """计算圈用时"""
         # 使用测量值作为主要时间源，间隔时间作为校准
         # 这里可以根据实际需求调整算法
-        return ( interval_ms + measurement_ms ) /1000
-    
-    def _calculate_speed(self, lap_time: float) -> float:
-        """计算速度"""
-        if lap_time <= 0:
+        return ( interval_ms + measurement_ms ) /1000 # time in seconds
+
+    def _calculate_speed(self, measurement_ms: float) -> float:
+        """
+        计算速度
+        measurement_ms: 测量时间（毫秒）
+        return: 速度（米/秒）
+        """
+        if measurement_ms <= 0:
             return 0.0
-        
-        # 使用配置中的物理常量计算速度
-        # 速度 = 距离 / 时间
-        distance = settings.distance_l
-        speed = distance / lap_time
-        
-        return speed
+
+        # 单位转换
+        distance_m = settings.distance_l / 1000  # 毫米转米
+        radius_r1_m = settings.radius_r1 / 100  # 厘米转米
+        radius_r2_m = settings.radius_r2  # 已经是米
+        measurement_s = measurement_ms / 1000  # 毫秒转秒
+
+        # 计算速度
+        speed_r1 = distance_m / measurement_s
+        speed_r2 = (radius_r2_m / radius_r1_m) * speed_r1
+
+        return speed_r2
     
     def _get_recent_laps_stats(self, count: int = 3) -> dict:
         """获取最近几圈的统计信息"""

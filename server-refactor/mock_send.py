@@ -25,7 +25,7 @@ def send_test_data():
             lap_count += 1
             
             # 生成模拟时间戳(90-120毫秒)
-            timestamp_ms = random.uniform(90, 120)
+            timestamp_ms = random.uniform(9, 12)
             
             # 发送数据
             message = str(timestamp_ms)

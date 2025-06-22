@@ -12,9 +12,9 @@ class Settings(BaseSettings):
     udp_port: int = 8888
     
     # 物理常量
-    distance_l: float = 3.0
-    radius_r1: float = 0.035
-    radius_r2: float = 15.0
+    distance_l: float = 3.0  # milimeters
+    radius_r1: float = 0.035 # centimeters
+    radius_r2: float = 1.5   # meters
     
     class Config:
         env_file = ".env"
