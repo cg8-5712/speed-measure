@@ -18,7 +18,7 @@ def send_test_data():
     print("🚀 开始发送测试数据到重构版服务器...")
     print(f"📡 目标服务器: {server_address[0]}:{server_address[1]}")
     print("⏸️  按 Ctrl+C 停止发送\n")
-    
+
     try:
         lap_count = 0
         while True:

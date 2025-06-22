@@ -104,7 +104,7 @@ class DataProcessor:
         """计算圈用时"""
         # 使用测量值作为主要时间源，间隔时间作为校准
         # 这里可以根据实际需求调整算法
-        return measurement_ms / 1000.0
+        return ( interval_ms + measurement_ms ) /1000
     
     def _calculate_speed(self, lap_time: float) -> float:
         """计算速度"""
