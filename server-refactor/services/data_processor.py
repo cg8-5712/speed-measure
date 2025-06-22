@@ -19,6 +19,7 @@ class DataProcessor:
     def __init__(self, websocket_manager):
         self.websocket_manager = websocket_manager
         self.is_monitoring = True  # 监测状态，默认开启
+        self.lap_count_setting = 3  # 统计圈数设置，默认3圈
         self.reset_data()
 
     def reset_data(self):
@@ -36,6 +37,17 @@ class DataProcessor:
         self.is_monitoring = is_monitoring
         status = "开启" if is_monitoring else "暂停"
         logger.info(f"监测状态已设置为：{status}")
+
+    def set_lap_count(self, lap_count: int):
+        """设置统计圈数"""
+        if lap_count < 1 or lap_count > 10:
+            logger.warning(f"无效的圈数设置: {lap_count}，保持当前设置: {self.lap_count_setting}")
+            return False
+
+        old_count = self.lap_count_setting
+        self.lap_count_setting = lap_count
+        logger.info(f"统计圈数已从 {old_count} 更新为 {lap_count}")
+        return True
 
     async def process_udp_data(self, raw_data: str, addr: tuple):
         """处理UDP数据"""
@@ -149,8 +161,12 @@ class DataProcessor:
 
         return speed_r2
 
-    def _get_laps_stats(self, count: int = 3) -> dict:
+    def _get_laps_stats(self, count: int = None) -> dict:
         """获取圈速统计信息"""
+        # 使用设置的圈数，如果没有传入参数的话
+        if count is None:
+            count = self.lap_count_setting
+
         if len(self.lap_times) == 0:
             stats = {
                 'best_laps': {'laps': '', 'total': 0},
@@ -176,29 +192,40 @@ class DataProcessor:
 
         if best_continuous:
             best_total = round(best_total, 3)
-            best_range = f"第{best_continuous[0][0]}-{best_continuous[-1][0]}圈"
+            if count == 1:
+                best_range = f"第{best_continuous[0][0]}圈"
+            else:
+                best_range = f"第{best_continuous[0][0]}-{best_continuous[-1][0]}圈"
         else:
             # 如果圈数不够count圈，就使用现有的所有圈
-            if len(lap_times_with_number) == 1:
-                best_range = f"第{lap_times_with_number[0][0]}圈"
-                best_total = round(lap_times_with_number[0][1], 3)
-            elif len(lap_times_with_number) > 1:
-                best_range = f"第{lap_times_with_number[0][0]}-{lap_times_with_number[-1][0]}圈"
-                best_total = round(sum(time for _, time in lap_times_with_number), 3)
-            else:
+            if len(lap_times_with_number) == 0:
                 best_range = ""
                 best_total = 0
+            elif len(lap_times_with_number) == 1:
+                best_range = f"第{lap_times_with_number[0][0]}圈"
+                best_total = round(lap_times_with_number[0][1], 3)
+            else:
+                # 当数据不足count圈时，显示实际的圈数范围
+                actual_count = min(count, len(lap_times_with_number))
+                if actual_count == 1:
+                    best_range = f"第{lap_times_with_number[-1][0]}圈"
+                    best_total = round(lap_times_with_number[-1][1], 3)
+                else:
+                    start_idx = len(lap_times_with_number) - actual_count
+                    end_idx = len(lap_times_with_number) - 1
+                    best_range = f"第{lap_times_with_number[start_idx][0]}-{lap_times_with_number[end_idx][0]}圈"
+                    best_total = round(sum(time for _, time in lap_times_with_number[start_idx:]), 3)
 
         # 获取最近圈速
         recent_laps = lap_times_with_number[-count:] if len(lap_times_with_number) >= count else lap_times_with_number
         recent_total = round(sum(time for _, time in recent_laps), 3)
 
-        if len(recent_laps) == 1:
-            recent_range = f"第{recent_laps[0][0]}圈"
-        elif len(recent_laps) > 1:
-            recent_range = f"第{recent_laps[0][0]}-{recent_laps[-1][0]}圈"
-        else:
+        if len(recent_laps) == 0:
             recent_range = ""
+        elif len(recent_laps) == 1:
+            recent_range = f"第{recent_laps[0][0]}圈"
+        else:
+            recent_range = f"第{recent_laps[0][0]}-{recent_laps[-1][0]}圈"
 
         stats = {
             'best_laps': {
@@ -208,6 +235,9 @@ class DataProcessor:
             'recent_laps': {
                 'laps': recent_range,
                 'total': recent_total
+            },
+            'setting': {
+                'lap_count': count  # 添加当前设置的圈数
             }
         }
 

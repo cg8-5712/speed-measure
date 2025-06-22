@@ -332,7 +332,35 @@
             color: #fca5a5;
         }
 
-        /* 响应式设计 */
+        /* 圈数设置样式 */
+        .lap-count-setting {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .lap-count-setting label {
+            color: white;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .lap-count-setting input {
+            width: 60px;
+            padding: 4px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .lap-count-setting input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -402,6 +430,11 @@
                     <button id="start-btn" class="btn btn-primary">开始监测</button>
                     <button id="stop-btn" class="btn btn-secondary" disabled>停止监测</button>
                     <button id="reset-btn" class="btn btn-warning">重置数据</button>
+                    <div class="lap-count-setting">
+                        <label for="lap-count-input">统计圈数:</label>
+                        <input type="number" id="lap-count-input" min="1" max="10" value="3">
+                        <button id="update-lap-count-btn" class="btn btn-secondary">更新</button>
+                    </div>
                 </div>
             </div>
         </header>
@@ -520,6 +553,8 @@
                     startBtn: document.getElementById('start-btn'),
                     stopBtn: document.getElementById('stop-btn'),
                     resetBtn: document.getElementById('reset-btn'),
+                    lapCountInput: document.getElementById('lap-count-input'),
+                    updateLapCountBtn: document.getElementById('update-lap-count-btn'),
 
                     currentLap: document.getElementById('current-lap'),
                     totalTime: document.getElementById('total-time'),
@@ -591,6 +626,14 @@
                 this.elements.startBtn.addEventListener('click', () => this.startMonitoring());
                 this.elements.stopBtn.addEventListener('click', () => this.stopMonitoring());
                 this.elements.resetBtn.addEventListener('click', () => this.resetData());
+                this.elements.updateLapCountBtn.addEventListener('click', () => this.updateLapCount());
+
+                // 回车键更新圈数
+                this.elements.lapCountInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.updateLapCount();
+                    }
+                });
 
                 // 页面卸载时断开连接
                 window.addEventListener('beforeunload', () => {
@@ -749,6 +792,29 @@
 
                     case 'monitoring_stopped':
                         this.addDebugLog('后端确认：停止监测');
+                        break;
+
+                    case 'lap_count_updated':
+                        this.addDebugLog(`圈数设置已更新为: ${data.lap_count}`);
+                        // 立即重新计算并更新显示统计数据
+                        this.requestCurrentStats();
+                        break;
+
+                    case 'error':
+                        this.addDebugLog(`错误: ${data.message}`, 'error');
+                        break;
+
+                    case 'current_stats':
+                        // 处理当前统计数据更新
+                        if (data.laps_stats) {
+                            if (data.laps_stats.recent_laps) {
+                                this.updateRecentLapsStats(data.laps_stats.recent_laps);
+                            }
+                            if (data.laps_stats.best_laps) {
+                                this.updateBestLapsStats(data.laps_stats.best_laps);
+                            }
+                            this.addDebugLog('统计数据已刷新');
+                        }
                         break;
 
                     default:
@@ -969,6 +1035,40 @@
 
                 // 同时输出到控制台
                 console.log(`[Speed Monitor] ${message}`);
+            }
+
+            updateLapCount() {
+                const lapCount = parseInt(this.elements.lapCountInput.value);
+
+                // 验证输入
+                if (isNaN(lapCount) || lapCount < 1 || lapCount > 10) {
+                    this.addDebugLog('无效的圈数设置，请输入1-10之间的数字', 'error');
+                    this.elements.lapCountInput.value = 3; // 重置为默认值
+                    return;
+                }
+
+                // 发送更新圈数指令给后端
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: 'update_lap_count',
+                        lap_count: lapCount,
+                        timestamp: Date.now()
+                    }));
+                    this.addDebugLog(`正在更新统计圈数为: ${lapCount}`);
+                } else {
+                    this.addDebugLog('WebSocket未连接，无法更新圈数设置', 'error');
+                }
+            }
+
+            requestCurrentStats() {
+                // 请求当前统计数据以刷新显示
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: 'request_current_stats',
+                        timestamp: Date.now()
+                    }));
+                    this.addDebugLog('请求当前统计数据');
+                }
             }
         }
 

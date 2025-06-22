@@ -74,6 +74,47 @@ async def handle_websocket_message(message: dict, websocket: WebSocket):
                 'timestamp': time.time() * 1000
             })
 
+    elif message_type == 'update_lap_count':
+        # 更新统计圈数
+        lap_count = message.get('lap_count')
+        if data_processor and lap_count:
+            success = data_processor.set_lap_count(lap_count)
+
+            if success:
+                await websocket_manager.send_data({
+                    'type': 'lap_count_updated',
+                    'message': f'统计圈数已更新为 {lap_count}',
+                    'lap_count': lap_count,
+                    'timestamp': time.time() * 1000
+                })
+                logger.info(f"圈数设置已更新为: {lap_count}")
+            else:
+                await websocket_manager.send_data({
+                    'type': 'error',
+                    'message': '无效的圈数设置，请输入1-10之间的数字',
+                    'timestamp': time.time() * 1000
+                })
+
+    elif message_type == 'request_current_stats':
+        # 请求当前统计数据
+        if data_processor and len(data_processor.lap_times) > 0:
+            current_stats = data_processor._get_laps_stats()
+            await websocket_manager.send_data({
+                'type': 'current_stats',
+                'laps_stats': current_stats,
+                'timestamp': time.time() * 1000
+            })
+            logger.info("已发送当前统计数据")
+        else:
+            await websocket_manager.send_data({
+                'type': 'current_stats',
+                'laps_stats': {
+                    'best_laps': {'laps': '', 'total': 0},
+                    'recent_laps': {'laps': '', 'total': 0}
+                },
+                'timestamp': time.time() * 1000
+            })
+
     else:
         logger.warning("未知的消息类型: %s", message_type)
 
