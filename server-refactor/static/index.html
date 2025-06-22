@@ -19,8 +19,6 @@
             min-height: 100vh;
             color: #37474f;
             line-height: 1.6;
-            margin: 0;
-            padding: 0;
         }
 
         /* 布局容器 */
@@ -160,8 +158,8 @@
             color: white;
         }
 
-        /* 设置模态窗口 */
-        .settings-modal {
+        /* 模态窗口样式 */
+        .modal {
             display: none;
             position: fixed;
             top: 0;
@@ -174,7 +172,7 @@
             animation: fadeIn 0.3s ease;
         }
 
-        .settings-content {
+        .modal-content {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -191,7 +189,7 @@
             animation: slideIn 0.3s ease;
         }
 
-        .settings-header {
+        .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -200,7 +198,7 @@
             border-bottom: 2px solid #e0f2f1;
         }
 
-        .settings-title {
+        .modal-title {
             font-size: 1.5rem;
             font-weight: 600;
             color: #37474f;
@@ -640,6 +638,19 @@
             border-bottom: none;
         }
 
+        /* 导出选项样式 */
+        .export-option {
+            background: rgba(79, 195, 247, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(79, 195, 247, 0.2);
+        }
+
+        .export-option:hover {
+            background: rgba(79, 195, 247, 0.1);
+        }
+
         /* 页脚样式 */
         .footer {
             background: linear-gradient(135deg, #eceff1 0%, #cfd8dc 100%);
@@ -770,6 +781,25 @@
             }
         }
 
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #e0f2f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #29b6f6 0%, #039be5 100%);
+        }
+
         /* 响应式设计 */
         @media (max-width: 768px) {
             .data-panels {
@@ -788,7 +818,7 @@
                 grid-template-columns: 1fr;
             }
 
-            .settings-content {
+            .modal-content {
                 width: 95%;
                 padding: 20px;
             }
@@ -834,25 +864,6 @@
                 margin-bottom: 15px;
             }
         }
-
-        /* 滚动条样式 */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #e0f2f1;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(135deg, #29b6f6 0%, #039be5 100%);
-        }
     </style>
 </head>
 <body>
@@ -875,11 +886,64 @@
             <button class="settings-button" id="settingsButton">⚙️</button>
         </div>
 
+        <!-- 导出选择模态窗口 -->
+        <div id="exportModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title">📊 选择导出内容</div>
+                    <button class="close-button" id="closeExportButton">✖️</button>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">请选择要导出的内容：</label>
+
+                    <div class="export-option">
+                        <label class="toggle-label">
+                            <span class="setting-label">📈 基础图表</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="exportChart" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <p style="font-size: 0.9rem; color: #78909c; margin-top: 5px;">导出Chart.js速度变化趋势图</p>
+                    </div>
+
+                    <div class="export-option">
+                        <label class="toggle-label">
+                            <span class="setting-label">🧠 智能统计分析</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="exportIntelligentStats">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <p style="font-size: 0.9rem; color: #78909c; margin-top: 5px;">包含最快组合、平均值等统计数据</p>
+                    </div>
+
+                    <div class="export-option">
+                        <label class="toggle-label">
+                            <span class="setting-label">📋 相对分析表格</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="exportRelativeAnalysis">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <p style="font-size: 0.9rem; color: #78909c; margin-top: 5px;">包含每圈相对时间差分析表格</p>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <button class="control-button export" id="confirmExportButton" style="width: 100%;">
+                        🚀 开始导出
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- 设置模态窗口 -->
-        <div id="settingsModal" class="settings-modal">
-            <div class="settings-content">
-                <div class="settings-header">
-                    <div class="settings-title">⚙️ 系统设置</div>
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title">⚙️ 系统设置</div>
                     <button class="close-button" id="closeSettingsButton">✖️</button>
                 </div>
 
@@ -893,16 +957,6 @@
                         <label class="setting-label">🔍 显示调试信息</label>
                         <label class="toggle-switch">
                             <input type="checkbox" id="settingShowDebug" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="setting-group">
-                    <div class="toggle-label">
-                        <label class="setting-label">📊 显示智能统计</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="settingShowIntelligentStats" checked>
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
@@ -958,10 +1012,17 @@
                     <div class="stats-item-value" id="bestLapsTime">0.000 s</div>
                 </div>
             </div>
+
+            <!-- 详情按钮 -->
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="toggleDetailsButton" class="control-button" style="min-width: 160px;">
+                    📊 显示详细分析
+                </button>
+            </div>
         </div>
 
         <!-- 智能统计分析 -->
-        <div class="intelligent-stats" id="intelligentStatsSection">
+        <div class="intelligent-stats" id="intelligentStatsSection" style="display: none;">
             <div class="card-title">🧠 智能统计分析</div>
             <div class="intelligent-stats-grid">
                 <div class="intelligent-stats-item">
@@ -998,7 +1059,7 @@
         </div>
 
         <!-- 相对分析表格 -->
-        <div class="relative-analysis" id="relativeAnalysisSection">
+        <div class="relative-analysis" id="relativeAnalysisSection" style="display: none;">
             <div class="card-title">📈 相对分析 - 每圈相对于最快圈的时间差</div>
             <div style="overflow-x: auto;">
                 <table class="relative-analysis-table" id="relativeAnalysisTable">
@@ -1092,7 +1153,6 @@
          * 速度监测系统 - 增强版本
          * 增加了图表导出和智能统计功能
          */
-
         class SpeedMonitorApp {
             constructor() {
                 this.ws = null;
@@ -1102,7 +1162,8 @@
                 this.lapData = [];
                 this.lapCountSetting = 3;
                 this.showDebug = true;
-                this.showIntelligentStats = true;
+                this.showIntelligentStats = true; // 智能统计始终启用
+                this.showDetailsView = false; // 默认不显示详细视图
                 this.maxDataPoints = 35;
                 this.hasInitialReset = false;
 
@@ -1110,7 +1171,7 @@
                 this.initChart();
                 this.bindEvents();
                 this.initializeDisplay();
-                this.addDebugLog('系统初始化完成');
+                this.addDebugLog('系统初始化完成 - 智能统计功能已启用');
 
                 // 页面加载时自动重置数据
                 this.autoResetOnPageLoad();
@@ -1128,13 +1189,23 @@
                     stopButton: document.getElementById('stopButton'),
                     exportChartButton: document.getElementById('exportChartButton'),
 
+                    // 详情切换
+                    toggleDetailsButton: document.getElementById('toggleDetailsButton'),
+
+                    // 导出模态窗口
+                    exportModal: document.getElementById('exportModal'),
+                    closeExportButton: document.getElementById('closeExportButton'),
+                    exportChart: document.getElementById('exportChart'),
+                    exportIntelligentStats: document.getElementById('exportIntelligentStats'),
+                    exportRelativeAnalysis: document.getElementById('exportRelativeAnalysis'),
+                    confirmExportButton: document.getElementById('confirmExportButton'),
+
                     // 设置相关
                     settingsButton: document.getElementById('settingsButton'),
                     settingsModal: document.getElementById('settingsModal'),
                     closeSettingsButton: document.getElementById('closeSettingsButton'),
                     settingLapNumber: document.getElementById('settingLapNumber'),
                     settingShowDebug: document.getElementById('settingShowDebug'),
-                    settingShowIntelligentStats: document.getElementById('settingShowIntelligentStats'),
                     resetDataButton: document.getElementById('resetDataButton'),
                     openSettingsLink: document.getElementById('openSettingsLink'),
 
@@ -1239,24 +1310,41 @@
             initializeDisplay() {
                 // 初始化显示状态
                 this.elements.debugInfo.style.display = this.showDebug ? 'flex' : 'none';
-                this.elements.intelligentStatsSection.style.display = this.showIntelligentStats ? 'block' : 'none';
-                this.elements.relativeAnalysisSection.style.display = this.showIntelligentStats ? 'block' : 'none';
+
+                // 同步设置复选框状态
+                this.elements.settingShowDebug.checked = this.showDebug;
+
+                // 确保详细分析按钮可见性
+                this.updateDetailsView();
 
                 this.addDebugLog('系统启动，等待数据输入');
                 this.addDebugLog('WebSocket连接中...');
 
                 // 更新初始智能统计（显示空数据状态）
                 this.updateIntelligentStats();
+
+                // 确保按钮文本正确
+                const buttonText = this.showDetailsView ? '📊 隐藏详细分析' : '📊 显示详细分析';
+                this.elements.toggleDetailsButton.textContent = buttonText;
+
+                this.addDebugLog(`初始化完成 - 详细视图: ${this.showDetailsView}`);
             }
 
             bindEvents() {
                 // 连接控制
                 this.elements.startButton.addEventListener('click', () => this.startMonitoring());
                 this.elements.stopButton.addEventListener('click', () => this.stopMonitoring());
-                this.elements.exportChartButton.addEventListener('click', () => this.exportChartImage());
+                this.elements.exportChartButton.addEventListener('click', () => this.openExportModal());
+
+                // 详情切换
+                this.elements.toggleDetailsButton.addEventListener('click', () => this.toggleDetailsView());
+
+                // 导出模态窗口
+                this.elements.closeExportButton.addEventListener('click', () => this.closeExportModal());
+                this.elements.confirmExportButton.addEventListener('click', () => this.handleExport());
 
                 // 图表控制
-                this.elements.exportPngButton.addEventListener('click', () => this.exportChartImage());
+                this.elements.exportPngButton.addEventListener('click', () => this.openExportModal());
 
                 // 设置窗口
                 this.elements.settingsButton.addEventListener('click', () => this.openSettings());
@@ -1269,7 +1357,6 @@
                 // 设置项
                 this.elements.settingLapNumber.addEventListener('change', () => this.updateLapCountSetting());
                 this.elements.settingShowDebug.addEventListener('change', () => this.toggleDebugDisplay());
-                this.elements.settingShowIntelligentStats.addEventListener('change', () => this.toggleIntelligentStatsDisplay());
                 this.elements.resetDataButton.addEventListener('click', () => this.resetData());
 
                 // 模态窗口点击外部关闭
@@ -1279,14 +1366,75 @@
                     }
                 });
 
+                this.elements.exportModal.addEventListener('click', (e) => {
+                    if (e.target === this.elements.exportModal) {
+                        this.closeExportModal();
+                    }
+                });
+
                 // 页面卸载时断开连接并自动重置数据
                 window.addEventListener('beforeunload', () => {
                     this.autoResetOnPageUnload();
                 });
             }
 
-            // 导出图表为PNG图片
-            exportChartImage() {
+            // 切换详细视图显示
+            toggleDetailsView() {
+                this.showDetailsView = !this.showDetailsView;
+
+                this.addDebugLog(`用户切换详细分析视图: ${this.showDetailsView ? '显示' : '隐藏'}`);
+                this.addDebugLog(`当前智能统计功能状态: ${this.showIntelligentStats ? '启用' : '禁用'}`);
+
+                this.updateDetailsView();
+
+                const buttonText = this.showDetailsView ? '📊 隐藏详细分析' : '📊 显示详细分析';
+                this.elements.toggleDetailsButton.textContent = buttonText;
+            }
+
+            // 更新详细视图显示状态
+            updateDetailsView() {
+                this.addDebugLog(`更新详细视图 - showDetailsView: ${this.showDetailsView}`);
+
+                const display = this.showDetailsView ? 'block' : 'none';
+                this.elements.intelligentStatsSection.style.display = display;
+                this.elements.relativeAnalysisSection.style.display = display;
+
+                this.addDebugLog(`设置详细分析显示状态: ${display}`);
+
+                // 如果显示详细视图，立即更新统计数据
+                if (this.showDetailsView) {
+                    this.addDebugLog('更新智能统计数据...');
+                    this.updateIntelligentStats();
+                }
+            }
+
+            // 打开导出模态窗口
+            openExportModal() {
+                this.elements.exportModal.style.display = 'block';
+            }
+
+            // 关闭导出模态窗口
+            closeExportModal() {
+                this.elements.exportModal.style.display = 'none';
+            }
+
+            // 处理导出
+            handleExport() {
+                const exportChart = this.elements.exportChart.checked;
+                const exportIntelligentStats = this.elements.exportIntelligentStats.checked;
+                const exportRelativeAnalysis = this.elements.exportRelativeAnalysis.checked;
+
+                if (!exportChart && !exportIntelligentStats && !exportRelativeAnalysis) {
+                    alert('请至少选择一项内容进行导出！');
+                    return;
+                }
+
+                this.closeExportModal();
+                this.exportSelectedContent(exportChart, exportIntelligentStats, exportRelativeAnalysis);
+            }
+
+            // 导出选定内容
+            exportSelectedContent(includeChart, includeIntelligentStats, includeRelativeAnalysis) {
                 if (!this.chart) {
                     this.addDebugLog('图表未初始化，无法导出', 'error');
                     return;
@@ -1296,74 +1444,127 @@
                     // 获取统计数据
                     const stats = this.calculateIntelligentStats();
 
-                    // 创建一个临时的canvas来绘制带统计信息的图表
+                    // 创建一个临时的canvas
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
 
-                    // 设置canvas尺寸
+                    // 计算canvas尺寸（根据导出内容调整）
+                    let canvasHeight = 200; // 基础高度（标题等）
+
+                    if (includeChart) canvasHeight += 450;
+                    if (includeIntelligentStats) canvasHeight += 300;
+                    if (includeRelativeAnalysis) canvasHeight += Math.min(400, this.lapData.length * 25 + 100);
+
                     tempCanvas.width = 1200;
-                    tempCanvas.height = 800;
+                    tempCanvas.height = canvasHeight;
 
                     // 设置背景色
                     tempCtx.fillStyle = '#ffffff';
                     tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-                    // 获取原始图表的图像数据
-                    const chartCanvas = this.chart.canvas;
-                    const chartImage = chartCanvas.toDataURL();
+                    let currentY = 0;
 
-                    // 加载图表图像
-                    const img = new Image();
-                    img.onload = () => {
-                        // 绘制图表
-                        tempCtx.drawImage(img, 50, 100, 1100, 450);
+                    // 绘制标题
+                    tempCtx.fillStyle = '#37474f';
+                    tempCtx.font = 'bold 32px Arial';
+                    tempCtx.textAlign = 'center';
+                    tempCtx.fillText('🏎️ 速度监测系统 - 数据分析报告', tempCanvas.width / 2, 40);
 
-                        // 添加标题
-                        tempCtx.fillStyle = '#37474f';
-                        tempCtx.font = 'bold 32px Arial';
-                        tempCtx.textAlign = 'center';
-                        tempCtx.fillText('🏎️ 速度监测系统 - 数据分析报告', tempCanvas.width / 2, 40);
+                    // 添加时间戳
+                    const timestamp = new Date().toLocaleString('zh-CN');
+                    tempCtx.font = '16px Arial';
+                    tempCtx.fillText(`导出时间: ${timestamp}`, tempCanvas.width / 2, 70);
 
-                        // 添加时间戳
-                        const timestamp = new Date().toLocaleString('zh-CN');
-                        tempCtx.font = '16px Arial';
-                        tempCtx.fillText(`导出时间: ${timestamp}`, tempCanvas.width / 2, 70);
+                    currentY = 100;
 
-                        // 添加统计信息
-                        this.drawStatsOnCanvas(tempCtx, stats, tempCanvas.width, tempCanvas.height);
+                    // 导出内容标识
+                    const exportTypes = [];
+                    if (includeChart) exportTypes.push('图表');
+                    if (includeIntelligentStats) exportTypes.push('智能统计');
+                    if (includeRelativeAnalysis) exportTypes.push('相对分析');
 
-                        // 导出图片
-                        const link = document.createElement('a');
-                        const filename = `speed_monitor_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
-                        link.download = filename;
-                        link.href = tempCanvas.toDataURL('image/png');
-                        link.click();
+                    tempCtx.font = '14px Arial';
+                    tempCtx.fillText(`导出内容: ${exportTypes.join(' + ')}`, tempCanvas.width / 2, currentY);
+                    currentY += 40;
 
-                        this.addDebugLog(`图表已导出为: ${filename}`);
-                    };
+                    // 绘制图表
+                    if (includeChart) {
+                        const chartCanvas = this.chart.canvas;
+                        const chartImage = chartCanvas.toDataURL();
 
-                    img.src = chartImage;
+                        const img = new Image();
+                        img.onload = () => {
+                            tempCtx.drawImage(img, 50, currentY, 1100, 400);
+                            currentY += 450;
+
+                            // 继续绘制其他内容
+                            this.continueExport(tempCtx, tempCanvas, stats, includeIntelligentStats, includeRelativeAnalysis, currentY);
+                        };
+                        img.src = chartImage;
+                    } else {
+                        // 直接绘制其他内容
+                        this.continueExport(tempCtx, tempCanvas, stats, includeIntelligentStats, includeRelativeAnalysis, currentY);
+                    }
 
                 } catch (error) {
-                    this.addDebugLog(`导出图表失败: ${error.message}`, 'error');
+                    this.addDebugLog(`导出失败: ${error.message}`, 'error');
                 }
             }
 
-            // 在canvas上绘制统计信息
-            drawStatsOnCanvas(ctx, stats, canvasWidth, canvasHeight) {
-                const startY = 580;
+            // 继续导出其他内容
+            continueExport(ctx, canvas, stats, includeIntelligentStats, includeRelativeAnalysis, startY) {
+                let currentY = startY;
+
+                // 绘制智能统计
+                if (includeIntelligentStats) {
+                    ctx.fillStyle = '#37474f';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('🧠 智能统计分析', 50, currentY);
+                    currentY += 40;
+
+                    this.drawIntelligentStatsOnCanvas(ctx, stats, currentY);
+                    currentY += 250;
+                }
+
+                // 绘制相对分析表格
+                if (includeRelativeAnalysis && this.lapData.length > 0) {
+                    ctx.fillStyle = '#37474f';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('📈 相对分析表格', 50, currentY);
+                    currentY += 40;
+
+                    this.drawRelativeAnalysisOnCanvas(ctx, currentY);
+                }
+
+                // 导出图片
+                const link = document.createElement('a');
+                const exportTypes = [];
+                if (includeChart) exportTypes.push('chart');
+                if (includeIntelligentStats) exportTypes.push('stats');
+                if (includeRelativeAnalysis) exportTypes.push('analysis');
+
+                const filename = `speed_monitor_${exportTypes.join('_')}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+                link.download = filename;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                this.addDebugLog(`报告已导出为: ${filename}`);
+            }
+
+            // 在canvas上绘制智能统计
+            drawIntelligentStatsOnCanvas(ctx, stats, startY) {
                 const leftCol = 80;
-                const rightCol = canvasWidth / 2 + 40;
+                const rightCol = 600;
 
                 ctx.fillStyle = '#37474f';
-                ctx.font = 'bold 20px Arial';
+                ctx.font = '16px Arial';
                 ctx.textAlign = 'left';
 
-                // 左列统计
-                ctx.fillText('📊 统计数据:', leftCol, startY);
-                ctx.font = '16px Arial';
+                let y = startY;
 
-                let y = startY + 30;
+                // 左列
                 ctx.fillText(`圈数范围: ${stats.lapRange}`, leftCol, y);
                 y += 25;
                 ctx.fillText(`总用时: ${stats.totalTime}`, leftCol, y);
@@ -1374,12 +1575,8 @@
                 y += 25;
                 ctx.fillText(`最快速度: ${stats.maxSpeed}`, leftCol, y);
 
-                // 右列统计
-                ctx.font = 'bold 20px Arial';
-                ctx.fillText('🏆 最佳表现:', rightCol, startY);
-                ctx.font = '16px Arial';
-
-                y = startY + 30;
+                // 右列
+                y = startY;
                 ctx.fillText(`最快单圈: ${stats.fastestLap}`, rightCol, y);
                 y += 25;
                 ctx.fillText(`最慢单圈: ${stats.slowestLap}`, rightCol, y);
@@ -1389,6 +1586,70 @@
                 ctx.fillText(`最快组合: ${stats.fastestCombo}`, rightCol, y);
                 y += 25;
                 ctx.fillText(`组合范围: ${stats.fastestComboRange}`, rightCol, y);
+            }
+
+            // 在canvas上绘制相对分析表格
+            drawRelativeAnalysisOnCanvas(ctx, startY) {
+                const times = this.lapData.map(lap => lap.time);
+                const fastestTime = Math.min(...times);
+
+                ctx.fillStyle = '#37474f';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+
+                // 表头
+                const colWidth = 200;
+                const cols = ['圈数', '圈速 (s)', '速度 (m/s)', '相对最快圈 (s)', '百分比差值'];
+
+                let y = startY;
+
+                // 绘制表头背景
+                ctx.fillStyle = 'rgba(79, 195, 247, 0.2)';
+                ctx.fillRect(50, y - 20, 1100, 30);
+
+                ctx.fillStyle = '#37474f';
+                ctx.font = 'bold 14px Arial';
+
+                for (let i = 0; i < cols.length; i++) {
+                    ctx.fillText(cols[i], 50 + i * colWidth + colWidth / 2, y);
+                }
+
+                y += 30;
+
+                // 绘制数据行
+                ctx.font = '12px Arial';
+                this.lapData.forEach((lap, index) => {
+                    const timeDiff = lap.time - fastestTime;
+                    const percentDiff = ((lap.time - fastestTime) / fastestTime * 100);
+                    const isFastest = lap.time === fastestTime;
+
+                    // 最快圈高亮
+                    if (isFastest) {
+                        ctx.fillStyle = 'rgba(77, 182, 172, 0.3)';
+                        ctx.fillRect(50, y - 15, 1100, 20);
+                    }
+
+                    ctx.fillStyle = '#37474f';
+
+                    const rowData = [
+                        `第${lap.lap}圈`,
+                        lap.time.toFixed(3),
+                        lap.speed.toFixed(2),
+                        isFastest ? '0.000' : '+' + timeDiff.toFixed(3),
+                        isFastest ? '0.0%' : '+' + percentDiff.toFixed(1) + '%'
+                    ];
+
+                    for (let i = 0; i < rowData.length; i++) {
+                        ctx.fillText(rowData[i], 50 + i * colWidth + colWidth / 2, y);
+                    }
+
+                    y += 20;
+                });
+            }
+
+            // 导出图表为PNG图片（保留原有功能）
+            exportChartImage() {
+                this.exportSelectedContent(true, false, false);
             }
 
             // 计算智能统计数据
@@ -1465,9 +1726,10 @@
 
             // 更新智能统计显示
             updateIntelligentStats() {
-                if (!this.showIntelligentStats) return;
+                this.addDebugLog(`更新智能统计 - 数据量: ${this.lapData.length}`);
 
                 if (this.lapData.length === 0) {
+                    this.addDebugLog('显示空数据状态');
                     // 显示空数据状态
                     this.elements.fastestComboTime.textContent = '-';
                     this.elements.fastestComboRange.textContent = '暂无数据';
@@ -1486,6 +1748,7 @@
                     return;
                 }
 
+                this.addDebugLog('计算统计数据...');
                 const times = this.lapData.map(lap => lap.time);
                 const speeds = this.lapData.map(lap => lap.speed);
 
@@ -1506,6 +1769,7 @@
                 // 最快连续组合
                 const fastestCombo = this.findFastestContinuousLaps(this.lapCountSetting);
 
+                this.addDebugLog('更新显示元素...');
                 // 更新显示
                 this.elements.fastestComboTime.textContent = `${fastestCombo.total.toFixed(3)} s`;
                 this.elements.fastestComboRange.textContent = fastestCombo.range;
@@ -1521,12 +1785,11 @@
 
                 // 更新相对分析表格
                 this.updateRelativeAnalysisTable();
+                this.addDebugLog('智能统计更新完成');
             }
 
             // 更新相对分析表格
             updateRelativeAnalysisTable() {
-                if (!this.showIntelligentStats) return;
-
                 const tableBody = this.elements.relativeAnalysisTableBody;
 
                 if (this.lapData.length === 0) {
@@ -1913,7 +2176,8 @@
                 this.elements.settingsModal.style.display = 'block';
                 this.elements.settingLapNumber.value = this.lapCountSetting;
                 this.elements.settingShowDebug.checked = this.showDebug;
-                this.elements.settingShowIntelligentStats.checked = this.showIntelligentStats;
+
+                this.addDebugLog(`打开设置`);
             }
 
             closeSettings() {
@@ -1949,13 +2213,6 @@
                 this.showDebug = this.elements.settingShowDebug.checked;
                 this.elements.debugInfo.style.display = this.showDebug ? 'flex' : 'none';
                 this.addDebugLog(`调试信息显示: ${this.showDebug ? '开启' : '关闭'}`);
-            }
-
-            toggleIntelligentStatsDisplay() {
-                this.showIntelligentStats = this.elements.settingShowIntelligentStats.checked;
-                this.elements.intelligentStatsSection.style.display = this.showIntelligentStats ? 'block' : 'none';
-                this.elements.relativeAnalysisSection.style.display = this.showIntelligentStats ? 'block' : 'none';
-                this.addDebugLog(`智能统计显示: ${this.showIntelligentStats ? '开启' : '关闭'}`);
             }
 
             resetData() {
