@@ -1,6 +1,7 @@
 """
 速度监测系统 - 重构版本
 使用FastAPI + WebSocket + UDP的简化架构
+支持暂停/继续监测功能
 """
 
 import json
@@ -30,7 +31,7 @@ websocket_manager = None
 data_processor = None
 
 
-async def handle_websocket_message(message: dict, _: WebSocket):
+async def handle_websocket_message(message: dict, websocket: WebSocket):
     """处理WebSocket消息"""
     message_type = message.get('type')
 
@@ -38,6 +39,8 @@ async def handle_websocket_message(message: dict, _: WebSocket):
         # 重置后端数据
         if data_processor:
             data_processor.reset_data()
+            # 重置后自动开启监测
+            data_processor.set_monitoring(True)
             logger.info("后端数据已重置")
 
             # 发送确认消息给客户端
@@ -46,6 +49,31 @@ async def handle_websocket_message(message: dict, _: WebSocket):
                 'message': '后端数据已重置，从第0圈开始',
                 'timestamp': time.time() * 1000
             })
+
+    elif message_type == 'start_monitoring':
+        # 开始监测
+        if data_processor:
+            data_processor.set_monitoring(True)
+            logger.info("开始监测")
+
+            await websocket_manager.send_data({
+                'type': 'monitoring_started',
+                'message': '监测已开始',
+                'timestamp': time.time() * 1000
+            })
+
+    elif message_type == 'stop_monitoring':
+        # 停止监测（暂停）
+        if data_processor:
+            data_processor.set_monitoring(False)
+            logger.info("停止监测（暂停）")
+
+            await websocket_manager.send_data({
+                'type': 'monitoring_stopped',
+                'message': '监测已暂停，数据保持连续',
+                'timestamp': time.time() * 1000
+            })
+
     else:
         logger.warning("未知的消息类型: %s", message_type)
 

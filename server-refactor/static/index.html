@@ -662,12 +662,30 @@
                 this.isMonitoring = true;
                 this.updateMonitoringStatus();
                 this.addDebugLog('开始数据监测');
+
+                // 发送开始监测指令给后端
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: 'start_monitoring',
+                        timestamp: Date.now()
+                    }));
+                    this.addDebugLog('已发送开始监测指令给后端');
+                }
             }
 
             stopMonitoring() {
                 this.isMonitoring = false;
                 this.updateMonitoringStatus();
-                this.addDebugLog('停止数据监测');
+                this.addDebugLog('停止数据监测（数据保持，可继续）');
+
+                // 发送停止监测指令给后端
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: 'stop_monitoring',
+                        timestamp: Date.now()
+                    }));
+                    this.addDebugLog('已发送停止监测指令给后端');
+                }
             }
 
             updateConnectionStatus(status) {
@@ -709,11 +727,6 @@
             }
 
             handleMessage(data) {
-                // 只有在监测状态下才处理lap_data
-                if (!this.isMonitoring && data.type === 'lap_data') {
-                    return;
-                }
-
                 this.addDebugLog(`收到消息: ${data.type}`);
 
                 switch (data.type) {
@@ -722,11 +735,20 @@
                         break;
 
                     case 'lap_data':
+                        // 无论是否在监测状态都接收数据，但会在处理函数中根据状态决定是否显示
                         this.handleLapData(data);
                         break;
 
                     case 'reset_confirm':
                         this.addDebugLog(data.message);
+                        break;
+
+                    case 'monitoring_started':
+                        this.addDebugLog('后端确认：开始监测');
+                        break;
+
+                    case 'monitoring_stopped':
+                        this.addDebugLog('后端确认：停止监测');
                         break;
 
                     default:
@@ -735,8 +757,14 @@
             }
 
             handleLapData(data) {
+                // 只有在监测状态下才更新显示
+                if (!this.isMonitoring) {
+                    this.addDebugLog(`停止状态，忽略数据: 第${data.lap_number}圈`);
+                    return;
+                }
+
                 // 添加调试信息
-                this.addDebugLog(`收到圈速数据: ${JSON.stringify(data)}`);
+                this.addDebugLog(`收到圈速数据: 第${data.lap_number}圈`);
 
                 // 更新基本统计数据
                 this.elements.currentLap.textContent = data.lap_number;
@@ -754,21 +782,13 @@
 
                 // 更新圈速统计 - 适配新的数据结构
                 if (data.laps_stats) {
-                    this.addDebugLog(`收到laps_stats数据: ${JSON.stringify(data.laps_stats)}`);
-
                     if (data.laps_stats.recent_laps) {
                         this.updateRecentLapsStats(data.laps_stats.recent_laps);
-                    } else {
-                        this.addDebugLog('laps_stats中未找到recent_laps数据');
                     }
 
                     if (data.laps_stats.best_laps) {
                         this.updateBestLapsStats(data.laps_stats.best_laps);
-                    } else {
-                        this.addDebugLog('laps_stats中未找到best_laps数据');
                     }
-                } else {
-                    this.addDebugLog('未收到laps_stats数据');
                 }
 
                 // 添加到数据数组
@@ -950,7 +970,6 @@
                 // 同时输出到控制台
                 console.log(`[Speed Monitor] ${message}`);
             }
-
         }
 
         // 当页面加载完成后初始化应用
