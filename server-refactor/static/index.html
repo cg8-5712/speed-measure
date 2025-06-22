@@ -914,6 +914,7 @@
                 this.lapCountSetting = 3;
                 this.showDebug = true;
                 this.maxDataPoints = 50;
+                this.hasInitialReset = false; // 标记是否已进行初始重置
 
                 this.initElements();
                 this.initChart();
@@ -1058,17 +1059,6 @@
                 window.addEventListener('beforeunload', () => {
                     this.autoResetOnPageUnload();
                 });
-
-                // 页面可见性变化时的处理
-                document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') {
-                        // 页面重新可见时重置数据
-                        this.addDebugLog('页面重新激活，准备重置数据');
-                        setTimeout(() => {
-                            this.autoResetOnPageVisible();
-                        }, 1000); // 延迟1秒确保连接稳定
-                    }
-                });
             }
 
             connect() {
@@ -1084,9 +1074,12 @@
                         this.updateConnectionStatus('connected');
                         this.addDebugLog('WebSocket连接成功');
 
-                        // 连接成功后自动重置数据并请求当前数据状态
+                        // 连接成功后，只在初始连接时重置数据
                         setTimeout(() => {
-                            this.performAutoReset();
+                            if (!this.hasInitialReset) {
+                                this.performAutoReset();
+                                this.hasInitialReset = true;
+                            }
                             this.requestCurrentStats();
                         }, 500);
 
@@ -1498,7 +1491,29 @@
             autoResetOnPageLoad() {
                 this.addDebugLog('页面加载时自动重置数据');
                 this.performAutoReset();
+                this.hasInitialReset = true;
                 this.addDebugLog('数据已重置，请手动启动检测');
+            }
+
+            // 处理页面可见性变化
+            handlePageVisibilityChange() {
+                const now = Date.now();
+                const timeSincePageLoad = now - this.pageLoadTime;
+                const timeSinceHidden = this.pageHiddenTime ? now - this.pageHiddenTime : 0;
+
+                // 只有在以下情况下才重置：
+                // 1. 页面加载超过5分钟且隐藏时间超过30秒
+                // 2. 或者隐藏时间超过10分钟
+                if ((timeSincePageLoad > 5 * 60 * 1000 && timeSinceHidden > 30 * 1000) ||
+                    timeSinceHidden > 10 * 60 * 1000) {
+
+                    this.addDebugLog(`页面长时间不可见后重新激活 (隐藏${Math.round(timeSinceHidden/1000)}秒)，准备重置数据`);
+                    setTimeout(() => {
+                        this.autoResetOnPageVisible();
+                    }, 1000);
+                } else {
+                    this.addDebugLog(`页面重新可见 (隐藏${Math.round(timeSinceHidden/1000)}秒)，无需重置`);
+                }
             }
 
             // 页面卸载时自动重置数据
