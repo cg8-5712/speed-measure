@@ -18,7 +18,7 @@ class DataProcessor:
 
     def __init__(self, websocket_manager):
         self.websocket_manager = websocket_manager
-        self.is_monitoring = True  # 监测状态，默认开启
+        self.is_monitoring = False  # 监测状态，默认关闭
         self.lap_count_setting = 3  # 统计圈数设置，默认3圈
         self.reset_data()
 

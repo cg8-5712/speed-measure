@@ -908,7 +908,7 @@
             constructor() {
                 this.ws = null;
                 this.isConnected = false;
-                this.isMonitoring = false;
+                this.isMonitoring = false; // 默认不监测，等待用户手动启动
                 this.chart = null;
                 this.lapData = [];
                 this.lapCountSetting = 3;
@@ -920,6 +920,9 @@
                 this.bindEvents();
                 this.initializeDisplay();
                 this.addDebugLog('系统初始化完成');
+
+                // 页面加载时自动重置数据
+                this.autoResetOnPageLoad();
 
                 // 自动连接WebSocket
                 this.connect();
@@ -1051,10 +1054,19 @@
                     }
                 });
 
-                // 页面卸载时断开连接
+                // 页面卸载时断开连接并自动重置数据
                 window.addEventListener('beforeunload', () => {
-                    if (this.ws) {
-                        this.ws.close();
+                    this.autoResetOnPageUnload();
+                });
+
+                // 页面可见性变化时的处理
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        // 页面重新可见时重置数据
+                        this.addDebugLog('页面重新激活，准备重置数据');
+                        setTimeout(() => {
+                            this.autoResetOnPageVisible();
+                        }, 1000); // 延迟1秒确保连接稳定
                     }
                 });
             }
@@ -1072,10 +1084,14 @@
                         this.updateConnectionStatus('connected');
                         this.addDebugLog('WebSocket连接成功');
 
-                        // 连接成功后请求当前数据状态
+                        // 连接成功后自动重置数据并请求当前数据状态
                         setTimeout(() => {
+                            this.performAutoReset();
                             this.requestCurrentStats();
                         }, 500);
+
+                        // 不再自动启动监测，等待用户手动启动
+                        this.addDebugLog('请手动点击"启动检测"开始监测');
                     };
 
                     this.ws.onmessage = (event) => {
@@ -1425,31 +1441,19 @@
             }
 
             resetData() {
-                if (confirm('确定要重置所有数据吗？')) {
+                if (confirm('确定要手动重置所有数据吗？')) {
                     // 发送重置指令给后端
                     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                         this.ws.send(JSON.stringify({
                             type: 'reset_data',
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
+                            reason: 'manual_reset'
                         }));
                     }
 
                     // 重置前端数据
-                    this.lapData = [];
-
-                    // 重置显示
-                    this.elements.currentLap.textContent = '0';
-                    this.elements.totalTime.textContent = '0.000 s';
-                    this.elements.lapDetails.innerHTML = '<div class="lap-item">暂无圈速数据</div>';
-                    this.elements.recentLapsDetails.innerHTML = '<div class="recent-lap-item">暂无数据</div>';
-                    this.elements.statsSection.style.display = 'none';
-
-                    // 清空图表
-                    this.chart.data.labels = [];
-                    this.chart.data.datasets[0].data = [];
-                    this.chart.update();
-
-                    this.addDebugLog('数据已重置');
+                    this.resetFrontendData();
+                    this.addDebugLog('手动重置数据完成');
                 }
             }
 
@@ -1488,6 +1492,72 @@
 
                 // 同时输出到控制台
                 console.log(`[Speed Monitor] ${message}`);
+            }
+
+            // 页面加载时自动重置数据
+            autoResetOnPageLoad() {
+                this.addDebugLog('页面加载时自动重置数据');
+                this.performAutoReset();
+                this.addDebugLog('数据已重置，请手动启动检测');
+            }
+
+            // 页面卸载时自动重置数据
+            autoResetOnPageUnload() {
+                this.addDebugLog('页面卸载时自动重置数据');
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: 'reset_data',
+                        timestamp: Date.now(),
+                        reason: 'page_unload'
+                    }));
+                }
+
+                // 关闭WebSocket连接
+                if (this.ws) {
+                    this.ws.close();
+                }
+            }
+
+            // 页面重新可见时自动重置数据
+            autoResetOnPageVisible() {
+                this.addDebugLog('页面重新可见时自动重置数据');
+                this.performAutoReset();
+                this.addDebugLog('数据已重置，请手动启动检测');
+            }
+
+            // 执行自动重置
+            performAutoReset() {
+                // 发送重置指令给后端
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: 'reset_data',
+                        timestamp: Date.now(),
+                        reason: 'auto_reset'
+                    }));
+                    this.addDebugLog('已发送自动重置指令给后端');
+                }
+
+                // 重置前端数据
+                this.resetFrontendData();
+            }
+
+            // 重置前端数据（不需要确认）
+            resetFrontendData() {
+                this.lapData = [];
+
+                // 重置显示
+                this.elements.currentLap.textContent = '0';
+                this.elements.totalTime.textContent = '0.000 s';
+                this.elements.lapDetails.innerHTML = '<div class="lap-item">暂无圈速数据</div>';
+                this.elements.recentLapsDetails.innerHTML = '<div class="recent-lap-item">暂无数据</div>';
+                this.elements.statsSection.style.display = 'none';
+
+                // 清空图表，保持示例数据结构
+                this.chart.data.labels = [];
+                this.chart.data.datasets[0].data = [];
+                this.chart.update();
+
+                this.addDebugLog('前端数据已自动重置');
             }
         }
 

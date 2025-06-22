@@ -39,14 +39,25 @@ async def handle_websocket_message(message: dict, websocket: WebSocket):
         # 重置后端数据
         if data_processor:
             data_processor.reset_data()
-            # 重置后自动开启监测
-            data_processor.set_monitoring(True)
-            logger.info("后端数据已重置")
+            # 重置后不自动开启监测，保持当前状态或关闭状态
+            data_processor.set_monitoring(False)
+
+            # 获取重置原因
+            reset_reason = message.get('reason', 'unknown')
+            logger.info(f"后端数据已重置，原因: {reset_reason}，监测状态: 关闭")
 
             # 发送确认消息给客户端
+            reason_text = {
+                'auto_reset': '自动重置',
+                'manual_reset': '手动重置',
+                'page_unload': '页面卸载重置',
+                'unknown': '重置'
+            }.get(reset_reason, '重置')
+
             await websocket_manager.send_data({
                 'type': 'reset_confirm',
-                'message': '后端数据已重置，从第0圈开始',
+                'message': f'后端数据已{reason_text}，从第0圈开始，请手动启动检测',
+                'reason': reset_reason,
                 'timestamp': time.time() * 1000
             })
 
@@ -97,23 +108,29 @@ async def handle_websocket_message(message: dict, websocket: WebSocket):
 
     elif message_type == 'request_current_stats':
         # 请求当前统计数据
-        if data_processor and len(data_processor.lap_times) > 0:
-            current_stats = data_processor._get_laps_stats()
-            await websocket_manager.send_data({
-                'type': 'current_stats',
-                'laps_stats': current_stats,
-                'timestamp': time.time() * 1000
-            })
-            logger.info("已发送当前统计数据")
+        if data_processor:
+            if len(data_processor.lap_times) > 0:
+                current_stats = data_processor._get_laps_stats()
+                await websocket_manager.send_data({
+                    'type': 'current_stats',
+                    'laps_stats': current_stats,
+                    'current_lap': data_processor.lap_count,
+                    'total_time': data_processor.total_time,
+                    'timestamp': time.time() * 1000
+                })
+                logger.info("已发送当前统计数据")
+            else:
+                # 没有数据时发送空状态
+                await websocket_manager.send_data({
+                    'type': 'current_stats',
+                    'laps_stats': None,
+                    'current_lap': 0,
+                    'total_time': 0.0,
+                    'timestamp': time.time() * 1000
+                })
+                logger.info("发送空状态数据")
         else:
-            await websocket_manager.send_data({
-                'type': 'current_stats',
-                'laps_stats': {
-                    'best_laps': {'laps': '', 'total': 0},
-                    'recent_laps': {'laps': '', 'total': 0}
-                },
-                'timestamp': time.time() * 1000
-            })
+            logger.warning("数据处理器未初始化")
 
     else:
         logger.warning("未知的消息类型: %s", message_type)
