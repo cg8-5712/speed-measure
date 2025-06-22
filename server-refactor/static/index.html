@@ -834,7 +834,7 @@
 
         <!-- 图表容器 -->
         <div class="chart-container">
-            <div class="chart-title">圈速变化趋势</div>
+            <div class="chart-title">速度变化趋势</div>
             <canvas id="velocityChart"></canvas>
         </div>
 
@@ -913,7 +913,7 @@
                 this.lapData = [];
                 this.lapCountSetting = 3;
                 this.showDebug = true;
-                this.maxDataPoints = 50;
+                this.maxDataPoints = 35;
                 this.hasInitialReset = false; // 标记是否已进行初始重置
 
                 this.initElements();
@@ -973,8 +973,8 @@
                     data: {
                         labels: ['第2圈', '第3圈', '第4圈', '第5圈', '第6圈', '第7圈', '第8圈', '第9圈', '第10圈', '第11圈', '第12圈', '第13圈', '第14圈', '第15圈', '第16圈', '第17圈', '第18圈', '第19圈', '第20圈', '第21圈', '第22圈'],
                         datasets: [{
-                            label: '圈速时间 (s)',
-                            data: [1.4, 0.95, 1.02, 1.35, 1.39, 0.85, 0.92, 1.01, 0.98, 1.21, 0.93, 1.05, 0.87, 1.18, 1.19, 1.42, 1.167, 1.181, 1.25, 1.485, 0.892],
+                            label: '速度 (m/s)',
+                            data: [2.1, 3.2, 2.9, 2.2, 2.1, 3.5, 3.3, 3.0, 3.1, 2.5, 3.2, 2.9, 3.4, 2.5, 2.5, 2.1, 2.6, 2.5, 2.4, 2.0, 3.4],
                             borderColor: '#4fc3f7',
                             backgroundColor: 'rgba(79, 195, 247, 0.1)',
                             borderWidth: 3,
@@ -1000,7 +1000,7 @@
                                 beginAtZero: true,
                                 title: {
                                     display: true,
-                                    text: '时间 (秒)'
+                                    text: '速度 (m/s)'
                                 },
                                 grid: {
                                     color: 'rgba(79, 195, 247, 0.1)'
@@ -1253,16 +1253,17 @@
             }
 
             handleLapData(data) {
-                this.addDebugLog(`第${data.lap_number}圈: ${data.lap_time}s`);
+                this.addDebugLog(`第${data.lap_number}圈: ${data.lap_time}s, 速度: ${data.speed}m/s`);
 
                 // 更新基本统计
                 this.elements.currentLap.textContent = data.lap_number;
                 this.elements.totalTime.textContent = `${data.total_time} s`;
 
-                // 添加到数据数组
+                // 添加到数据数组，包含速度信息
                 this.lapData.push({
                     lap: data.lap_number,
                     time: data.lap_time,
+                    speed: data.speed, // 重新加入速度数据
                     timestamp: data.timestamp
                 });
 
@@ -1289,11 +1290,11 @@
                     return;
                 }
 
-                // 显示最近的圈数（倒序）
+                // 显示最近的圈数（倒序），包含时间和速度
                 const recentLaps = this.lapData.slice(-20).reverse();
 
                 lapDetails.innerHTML = recentLaps.map(lap =>
-                    `<div class="lap-item">第${lap.lap}圈: ${lap.time}s</div>`
+                    `<div class="lap-item">第${lap.lap}圈: ${lap.time}s | ${lap.speed}m/s</div>`
                 ).join('');
             }
 
@@ -1344,25 +1345,37 @@
                     }
                 }
 
+                // 计算平均速度
+                const recentLapsData = [];
+                for (let lapNum = startLap; lapNum <= endLap; lapNum++) {
+                    const lapInfo = this.lapData.find(lap => lap.lap === lapNum);
+                    if (lapInfo) {
+                        recentLapsData.push(lapInfo);
+                    }
+                }
+
+                const averageTime = recentLaps.total / lapCount;
+                const averageSpeed = recentLapsData.length > 0 ?
+                    recentLapsData.reduce((sum, lap) => sum + lap.speed, 0) / recentLapsData.length : 0;
+
                 // 构建详细信息HTML
                 let detailsHTML = '';
 
                 // 添加统计信息
-                const averageTime = recentLaps.total / lapCount;
                 detailsHTML += `
                     <div class="recent-lap-item" style="background: linear-gradient(135deg, #81c784 0%, #66bb6a 100%); color: white; font-weight: 600;">
                         圈数范围: ${recentLaps.laps}
                     </div>
                     <div class="recent-lap-item" style="background: linear-gradient(135deg, #4db6ac 0%, #26a69a 100%); color: white; font-weight: 600;">
-                        总时间: ${recentLaps.total}s
+                        总时间: ${recentLaps.total}s | 平均: ${averageTime.toFixed(3)}s
                     </div>
                     <div class="recent-lap-item recent-lap-best">
-                        平均时间: ${averageTime.toFixed(3)}s
+                        平均速度: ${averageSpeed.toFixed(2)}m/s
                     </div>
                     <div style="height: 1px; background: #e0f2f1; margin: 8px 0;"></div>
                 `;
 
-                // 添加每圈详细时间
+                // 添加每圈详细时间和速度
                 for (let lapNum = startLap; lapNum <= endLap; lapNum++) {
                     const lapInfo = this.lapData.find(lap => lap.lap === lapNum);
                     if (lapInfo) {
@@ -1377,7 +1390,7 @@
                         detailsHTML += `
                             <div class="recent-lap-item ${isFastest ? 'recent-lap-best' : ''}"
                                  style="${isFastest ? '' : 'background: #f1f8e9; border-left: 4px solid #81c784;'}">
-                                第${lapNum}圈: ${lapInfo.time}s ${isFastest ? '🏆' : ''}
+                                第${lapNum}圈: ${lapInfo.time}s | ${lapInfo.speed}m/s ${isFastest ? '🏆' : ''}
                             </div>
                         `;
                     }
@@ -1388,10 +1401,10 @@
 
             updateChart() {
                 const labels = this.lapData.map(d => `第${d.lap}圈`);
-                const times = this.lapData.map(d => d.time);
+                const speeds = this.lapData.map(d => d.speed); // 改为速度数据
 
                 this.chart.data.labels = labels;
-                this.chart.data.datasets[0].data = times;
+                this.chart.data.datasets[0].data = speeds;
                 this.chart.update('none');
             }
 
