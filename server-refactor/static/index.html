@@ -402,7 +402,6 @@
                     <button id="start-btn" class="btn btn-primary">开始监测</button>
                     <button id="stop-btn" class="btn btn-secondary" disabled>停止监测</button>
                     <button id="reset-btn" class="btn btn-warning">重置数据</button>
-                    <button id="test-btn" class="btn btn-secondary">测试数据</button>
                 </div>
             </div>
         </header>
@@ -521,7 +520,6 @@
                     startBtn: document.getElementById('start-btn'),
                     stopBtn: document.getElementById('stop-btn'),
                     resetBtn: document.getElementById('reset-btn'),
-                    testBtn: document.getElementById('test-btn'),
 
                     currentLap: document.getElementById('current-lap'),
                     totalTime: document.getElementById('total-time'),
@@ -593,7 +591,6 @@
                 this.elements.startBtn.addEventListener('click', () => this.startMonitoring());
                 this.elements.stopBtn.addEventListener('click', () => this.stopMonitoring());
                 this.elements.resetBtn.addEventListener('click', () => this.resetData());
-                this.elements.testBtn.addEventListener('click', () => this.testLapsStats());
 
                 // 页面卸载时断开连接
                 window.addEventListener('beforeunload', () => {
@@ -954,35 +951,6 @@
                 console.log(`[Speed Monitor] ${message}`);
             }
 
-            // 测试功能 - 模拟圈速统计数据
-            testLapsStats() {
-                this.addDebugLog('开始测试圈速统计数据');
-
-                // 模拟数据
-                const testData = {
-                    type: 'lap_data',
-                    lap_number: 5,
-                    lap_time: 1.234,
-                    total_time: 6.789,
-                    speed: 15.67,
-                    timestamp: Date.now(),
-                    laps_stats: {
-                        best_laps: {
-                            laps: '2-4',
-                            total: 3.456
-                        },
-                        recent_laps: {
-                            laps: '3-5',
-                            total: 3.789
-                        }
-                    }
-                };
-
-                // 直接调用处理函数
-                this.handleLapData(testData);
-
-                this.addDebugLog('测试数据已发送');
-            }
         }
 
         // 当页面加载完成后初始化应用
