@@ -887,10 +887,24 @@
                 // 计算圈数
                 let lapCount = 1;
                 if (lapsRange.includes('-')) {
-                    const [start, end] = lapsRange.split('-').map(Number);
-                    lapCount = end - start + 1;
+                    // 解析 "第X-Y圈" 格式
+                    const rangeMatch = lapsRange.match(/第(\d+)-(\d+)圈/);
+                    if (rangeMatch) {
+                        const start = parseInt(rangeMatch[1]);
+                        const end = parseInt(rangeMatch[2]);
+                        lapCount = end - start + 1;
+                    }
+                } else if (lapsRange.includes('第') && lapsRange.includes('圈')) {
+                    // 解析 "第X圈" 格式
+                    lapCount = 1;
                 } else if (lapsRange && lapsRange !== '-') {
-                    lapCount = 1; // 单圈
+                    // 解析纯数字格式 "X-Y" 或 "X"
+                    if (lapsRange.includes('-')) {
+                        const [start, end] = lapsRange.split('-').map(Number);
+                        lapCount = end - start + 1;
+                    } else {
+                        lapCount = 1;
+                    }
                 } else {
                     lapCount = 0; // 无数据
                 }
@@ -903,7 +917,7 @@
                 this.elements.recentTotalTime.textContent = `${totalTime.toFixed(3)}s`;
                 this.elements.recentAverageTime.textContent = `${averageTime.toFixed(3)}s`;
 
-                this.addDebugLog(`最近圈速更新: ${lapsRange}, 总时间: ${totalTime}s, 平均: ${averageTime.toFixed(3)}s`);
+                this.addDebugLog(`最近圈速更新: ${lapsRange}, 总时间: ${totalTime}s, 圈数: ${lapCount}, 平均: ${averageTime.toFixed(3)}s`);
             }
 
             updateBestLapsStats(bestLaps) {
@@ -914,10 +928,24 @@
                 // 计算圈数
                 let lapCount = 1;
                 if (lapsRange.includes('-')) {
-                    const [start, end] = lapsRange.split('-').map(Number);
-                    lapCount = end - start + 1;
+                    // 解析 "第X-Y圈" 格式
+                    const rangeMatch = lapsRange.match(/第(\d+)-(\d+)圈/);
+                    if (rangeMatch) {
+                        const start = parseInt(rangeMatch[1]);
+                        const end = parseInt(rangeMatch[2]);
+                        lapCount = end - start + 1;
+                    }
+                } else if (lapsRange.includes('第') && lapsRange.includes('圈')) {
+                    // 解析 "第X圈" 格式
+                    lapCount = 1;
                 } else if (lapsRange && lapsRange !== '-') {
-                    lapCount = 1; // 单圈
+                    // 解析纯数字格式 "X-Y" 或 "X"
+                    if (lapsRange.includes('-')) {
+                        const [start, end] = lapsRange.split('-').map(Number);
+                        lapCount = end - start + 1;
+                    } else {
+                        lapCount = 1;
+                    }
                 } else {
                     lapCount = 0; // 无数据
                 }
@@ -930,7 +958,7 @@
                 this.elements.bestTotalTime.textContent = `${totalTime.toFixed(3)}s`;
                 this.elements.bestAverageTime.textContent = `${averageTime.toFixed(3)}s`;
 
-                this.addDebugLog(`最佳圈速更新: ${lapsRange}, 总时间: ${totalTime}s, 平均: ${averageTime.toFixed(3)}s`);
+                this.addDebugLog(`最佳圈速更新: ${lapsRange}, 总时间: ${totalTime}s, 圈数: ${lapCount}, 平均: ${averageTime.toFixed(3)}s`);
             }
 
             updateChart() {
