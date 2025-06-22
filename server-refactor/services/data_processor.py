@@ -82,7 +82,7 @@ class DataProcessor:
         
         logger.info("圈数: %d, 圈用时: %.3f秒, 速度: %.2f", 
                    self.lap_count, lap_time, speed)
-        
+
         # 构造数据包
         data_packet = {
             'type': 'lap_data',
@@ -94,7 +94,7 @@ class DataProcessor:
             'measurement': timestamp_ms,
             'interval': round(interval_ms, 1),
             'from': f"{addr[0]}:{addr[1]}",
-            'recent_laps': self._get_recent_laps_stats()
+            'laps_stats': self._get_laps_stats()  # 新的统计数据
         }
         
         # 发送数据给WebSocket客户端
@@ -126,22 +126,54 @@ class DataProcessor:
         speed_r2 = (radius_r2_m / radius_r1_m) * speed_r1
 
         return speed_r2
-    
-    def _get_recent_laps_stats(self, count: int = 3) -> dict:
-        """获取最近几圈的统计信息"""
+
+    def _get_laps_stats(self, count: int = 3) -> dict:
+        """获取圈速统计信息"""
         if len(self.lap_times) == 0:
-            return {
-                'count': 0,
-                'total_time': 0.0,
-                'average_time': 0.0,
-                'best_time': 0.0
+            stats = {
+                'best_laps': {'laps': '', 'total': 0},
+                'recent_laps': {'laps': '', 'total': 0}
             }
-        
-        recent_times = self.lap_times[-count:] if len(self.lap_times) >= count else self.lap_times
-        
-        return {
-            'count': len(recent_times),
-            'total_time': round(sum(recent_times), 3),
-            'average_time': round(sum(recent_times) / len(recent_times), 3),
-            'best_time': round(min(recent_times), 3)
+            print("圈速统计：", stats)
+            return stats
+
+        # 创建包含圈号和用时的元组列表
+        lap_times_with_number = [(i + 1, time) for i, time in enumerate(self.lap_times)]
+
+        # 获取连续的最快count圈
+        best_total = float('inf')
+        best_continuous = None
+
+        # 使用滑动窗口找出连续的最快圈
+        for i in range(len(lap_times_with_number) - count + 1):
+            window = lap_times_with_number[i:i + count]
+            total = sum(time for _, time in window)
+            if total < best_total:
+                best_total = total
+                best_continuous = window
+
+        if best_continuous:
+            best_total = round(best_total, 3)
+            best_range = f"{best_continuous[0][0]}-{best_continuous[-1][0]}"
+        else:
+            best_total = 0
+            best_range = ""
+
+        # 获取最近圈速
+        recent_laps = lap_times_with_number[-count:]
+        recent_total = round(sum(time for _, time in recent_laps), 3)
+        recent_range = f"{recent_laps[0][0]}-{recent_laps[-1][0]}"
+
+        stats = {
+            'best_laps': {
+                'laps': best_range,
+                'total': best_total
+            },
+            'recent_laps': {
+                'laps': recent_range,
+                'total': recent_total
+            }
         }
+
+        print("圈速统计：", stats)
+        return stats
