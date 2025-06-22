@@ -376,7 +376,7 @@
         }
 
         .panel-content {
-            max-height: 200px;
+            max-height: 400px; /* 限制高度约15行 */
             overflow-y: auto;
             padding: 15px;
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
@@ -517,6 +517,13 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
         }
 
+        .relative-analysis-table-container {
+            max-height: 400px; /* 限制高度约15行 */
+            overflow-y: auto;
+            border-radius: 10px;
+            border: 1px solid #e0f2f1;
+        }
+
         .relative-analysis-table {
             width: 100%;
             border-collapse: collapse;
@@ -536,6 +543,9 @@
             background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
             color: white;
             font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .relative-analysis-table tr:hover {
@@ -1061,7 +1071,7 @@
         <!-- 相对分析表格 -->
         <div class="relative-analysis" id="relativeAnalysisSection" style="display: none;">
             <div class="card-title">📈 相对分析 - 每圈相对于最快圈的时间差</div>
-            <div style="overflow-x: auto;">
+            <div class="relative-analysis-table-container">
                 <table class="relative-analysis-table" id="relativeAnalysisTable">
                     <thead>
                         <tr>
@@ -1164,7 +1174,8 @@
                 this.showDebug = true;
                 this.showIntelligentStats = true; // 智能统计始终启用
                 this.showDetailsView = false; // 默认不显示详细视图
-                this.maxDataPoints = 35;
+                this.maxDataPoints = 1000; // 增加到1000条数据
+                this.maxLapDisplayCount = 1000; // 圈速详细时间最多显示1000条
                 this.hasInitialReset = false;
 
                 this.initElements();
@@ -2054,12 +2065,22 @@
                     return;
                 }
 
-                // 显示最近的圈数（倒序），包含时间和速度
-                const recentLaps = this.lapData.slice(-20).reverse();
+                // 显示最近的圈数（倒序），最多显示1000条
+                const displayCount = Math.min(this.lapData.length, this.maxLapDisplayCount);
+                const recentLaps = this.lapData.slice(-displayCount);
 
                 lapDetails.innerHTML = recentLaps.map(lap =>
                     `<div class="lap-item">第${lap.lap}圈: ${lap.time}s | ${lap.speed}m/s</div>`
                 ).join('');
+
+                // 如果有数据被截断，显示提示
+                if (this.lapData.length > this.maxLapDisplayCount) {
+                    lapDetails.innerHTML = `
+                        <div style="background: linear-gradient(135deg, #ff7043 0%, #ff5722 100%); color: white; padding: 8px 12px; margin: 3px 0; border-radius: 8px; text-align: center; font-weight: 600;">
+                            显示最近${this.maxLapDisplayCount}圈数据 (共${this.lapData.length}圈)
+                        </div>
+                    ` + lapDetails.innerHTML;
+                }
             }
 
             updateStatsDisplay(lapsStats) {
