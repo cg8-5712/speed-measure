@@ -647,10 +647,62 @@ input:checked + .toggle-slider:before {
     padding: 15px;
     margin-bottom: 15px;
     border: 1px solid rgba(79, 195, 247, 0.2);
+    transition: all 0.3s ease;
 }
 
 .export-option:hover {
     background: rgba(79, 195, 247, 0.1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(79, 195, 247, 0.1);
+}
+
+/* 通知样式增强 */
+.notification {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    border-radius: 12px;
+    border: none;
+    backdrop-filter: blur(10px);
+}
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notification-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.notification-message {
+    flex: 1;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.notification-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    margin-left: auto;
+    opacity: 0.8;
+    transition: all 0.2s ease;
+    padding: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-close:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
 }
 
 /* 页脚样式 */
@@ -717,6 +769,11 @@ input:checked + .toggle-slider:before {
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 500;
+    transition: transform 0.2s ease;
+}
+
+.tech-badge:hover {
+    transform: translateY(-1px);
 }
 
 .footer-bottom {
@@ -768,6 +825,28 @@ input:checked + .toggle-slider:before {
     to {
         opacity: 1;
         transform: translate(-50%, -50%);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
     }
 }
 
@@ -864,5 +943,47 @@ input:checked + .toggle-slider:before {
         position: static;
         justify-content: center;
         margin-bottom: 15px;
+    }
+
+    .chart-container {
+        height: 400px;
+    }
+
+    .notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+
+/* 小屏幕额外优化 */
+@media (max-width: 480px) {
+    .container {
+        padding: 10px;
+    }
+
+    .header h1 {
+        font-size: 2rem;
+    }
+
+    .control-button {
+        min-width: 180px;
+        padding: 12px 20px;
+        font-size: 0.9rem;
+    }
+
+    .export-option {
+        padding: 12px;
+    }
+
+    .chart-container {
+        height: 350px;
+        padding: 15px;
+    }
+
+    .panel-content {
+        max-height: 200px;
+        font-size: 0.8rem;
     }
 }

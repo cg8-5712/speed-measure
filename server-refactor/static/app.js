@@ -1,4 +1,3 @@
-
 /**
  * 速度监测系统 - 增强版本
  * 增加了图表导出和智能统计功能
@@ -29,6 +28,9 @@ class SpeedMonitorApp {
 
         // 自动连接WebSocket
         this.connect();
+
+        // 初始化通知样式
+        this.initNotificationStyles();
     }
 
     initElements() {
@@ -229,6 +231,70 @@ class SpeedMonitorApp {
         });
     }
 
+    // 初始化通知样式
+    initNotificationStyles() {
+        if (!document.getElementById('notification-styles')) {
+            const styleElement = document.createElement('style');
+            styleElement.id = 'notification-styles';
+            styleElement.textContent = `
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+
+                @keyframes slideOutRight {
+                    from {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                }
+
+                .notification-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+
+                .notification-close {
+                    background: none;
+                    border: none;
+                    color: white;
+                    font-size: 18px;
+                    cursor: pointer;
+                    margin-left: auto;
+                    opacity: 0.8;
+                    transition: opacity 0.2s;
+                    padding: 0;
+                    width: 20px;
+                    height: 20px;
+                }
+
+                .notification-close:hover {
+                    opacity: 1;
+                }
+
+                .progress-bar {
+                    height: 6px;
+                    background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+                    width: 0%;
+                    transition: width 2s ease;
+                    border-radius: 3px;
+                }
+            `;
+            document.head.appendChild(styleElement);
+        }
+    }
+
     // 切换详细视图显示
     toggleDetailsView() {
         this.showDetailsView = !this.showDetailsView;
@@ -259,9 +325,22 @@ class SpeedMonitorApp {
         }
     }
 
-    // 打开导出模态窗口
+    // 改进的导出模态窗口处理
     openExportModal() {
+        // 检查是否有数据可导出
+        if (this.lapData.length === 0) {
+            this.showNotification('暂无数据可导出，请先开始监测并记录一些圈速数据！', 'warning');
+            return;
+        }
+
         this.elements.exportModal.style.display = 'block';
+
+        // 自动选择合适的默认选项
+        this.elements.exportChart.checked = true;
+        this.elements.exportIntelligentStats.checked = this.lapData.length >= 3;
+        this.elements.exportRelativeAnalysis.checked = this.lapData.length >= 5;
+
+        this.addDebugLog(`打开导出窗口 - 数据量: ${this.lapData.length}圈`);
     }
 
     // 关闭导出模态窗口
@@ -269,207 +348,330 @@ class SpeedMonitorApp {
         this.elements.exportModal.style.display = 'none';
     }
 
-    // 处理导出
+    // 改进的导出内容处理
     handleExport() {
         const exportChart = this.elements.exportChart.checked;
         const exportIntelligentStats = this.elements.exportIntelligentStats.checked;
         const exportRelativeAnalysis = this.elements.exportRelativeAnalysis.checked;
 
         if (!exportChart && !exportIntelligentStats && !exportRelativeAnalysis) {
-            alert('请至少选择一项内容进行导出！');
+            this.showNotification('请至少选择一项内容进行导出！', 'error');
             return;
         }
 
+        // 显示导出进度
+        this.showExportProgress();
         this.closeExportModal();
-        this.exportSelectedContent(exportChart, exportIntelligentStats, exportRelativeAnalysis);
+
+        // 延迟执行导出以显示进度
+        setTimeout(() => {
+            this.exportSelectedContent(exportChart, exportIntelligentStats, exportRelativeAnalysis);
+        }, 100);
     }
 
-    // 导出选定内容
+    // 显示导出进度
+    showExportProgress() {
+        const progressModal = this.createProgressModal();
+        document.body.appendChild(progressModal);
+
+        // 自动关闭进度窗口
+        setTimeout(() => {
+            if (progressModal.parentNode) {
+                progressModal.parentNode.removeChild(progressModal);
+            }
+        }, 3000);
+    }
+
+    // 创建进度模态窗口
+    createProgressModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'block';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px; text-align: center;">
+                <div style="padding: 20px;">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">📊</div>
+                    <h3 style="color: #37474f; margin-bottom: 10px;">正在导出数据...</h3>
+                    <div style="width: 100%; background: #e0f2f1; border-radius: 10px; overflow: hidden; margin: 20px 0;">
+                        <div class="progress-bar" style="height: 6px; background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%); width: 0%; transition: width 2s ease;"></div>
+                    </div>
+                    <p style="color: #78909c; font-size: 0.9rem;">请稍候，正在生成报告...</p>
+                </div>
+            </div>
+        `;
+
+        // 启动进度条动画
+        setTimeout(() => {
+            const progressBar = modal.querySelector('.progress-bar');
+            if (progressBar) {
+                progressBar.style.width = '100%';
+            }
+        }, 100);
+
+        return modal;
+    }
+
+    // 改进的导出选定内容方法
     exportSelectedContent(includeChart, includeIntelligentStats, includeRelativeAnalysis) {
         if (!this.chart) {
-            this.addDebugLog('图表未初始化，无法导出', 'error');
+            this.showNotification('图表未初始化，无法导出', 'error');
             return;
         }
 
         try {
+            this.addDebugLog('开始生成导出内容...');
+
             // 获取统计数据
             const stats = this.calculateIntelligentStats();
+            const exportInfo = this.getExportInfo(includeChart, includeIntelligentStats, includeRelativeAnalysis);
 
-            // 创建一个临时的canvas
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
+            // 创建导出canvas
+            const canvas = this.createExportCanvas(exportInfo);
 
-            // 计算canvas尺寸（根据导出内容调整）
-            let canvasHeight = 200; // 基础高度（标题等）
-
-            if (includeChart) canvasHeight += 450;
-            if (includeIntelligentStats) canvasHeight += 300;
-            if (includeRelativeAnalysis) canvasHeight += Math.min(400, this.lapData.length * 25 + 100);
-
-            tempCanvas.width = 1200;
-            tempCanvas.height = canvasHeight;
-
-            // 设置背景色
-            tempCtx.fillStyle = '#ffffff';
-            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-
-            let currentY = 0;
-
-            // 绘制标题
-            tempCtx.fillStyle = '#37474f';
-            tempCtx.font = 'bold 32px Arial';
-            tempCtx.textAlign = 'center';
-            tempCtx.fillText('🏎️ 速度监测系统 - 数据分析报告', tempCanvas.width / 2, 40);
-
-            // 添加时间戳
-            const timestamp = new Date().toLocaleString('zh-CN');
-            tempCtx.font = '16px Arial';
-            tempCtx.fillText(`导出时间: ${timestamp}`, tempCanvas.width / 2, 70);
-
-            currentY = 100;
-
-            // 导出内容标识
-            const exportTypes = [];
-            if (includeChart) exportTypes.push('图表');
-            if (includeIntelligentStats) exportTypes.push('智能统计');
-            if (includeRelativeAnalysis) exportTypes.push('相对分析');
-
-            tempCtx.font = '14px Arial';
-            tempCtx.fillText(`导出内容: ${exportTypes.join(' + ')}`, tempCanvas.width / 2, currentY);
-            currentY += 40;
-
-            // 绘制图表
             if (includeChart) {
-                const chartCanvas = this.chart.canvas;
-                const chartImage = chartCanvas.toDataURL();
-
-                const img = new Image();
-                img.onload = () => {
-                    tempCtx.drawImage(img, 50, currentY, 1100, 400);
-                    currentY += 450;
-
-                    // 继续绘制其他内容
-                    this.continueExport(tempCtx, tempCanvas, stats, includeIntelligentStats, includeRelativeAnalysis, currentY);
-                };
-                img.src = chartImage;
+                this.exportWithChart(canvas, stats, includeIntelligentStats, includeRelativeAnalysis, exportInfo);
             } else {
-                // 直接绘制其他内容
-                this.continueExport(tempCtx, tempCanvas, stats, includeIntelligentStats, includeRelativeAnalysis, currentY);
+                this.exportWithoutChart(canvas, stats, includeIntelligentStats, includeRelativeAnalysis, exportInfo);
             }
 
         } catch (error) {
             this.addDebugLog(`导出失败: ${error.message}`, 'error');
+            this.showNotification(`导出失败: ${error.message}`, 'error');
         }
     }
 
-    // 继续导出其他内容
-    continueExport(ctx, canvas, stats, includeIntelligentStats, includeRelativeAnalysis, startY) {
-        let currentY = startY;
-
-        // 绘制智能统计
-        if (includeIntelligentStats) {
-            ctx.fillStyle = '#37474f';
-            ctx.font = 'bold 24px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText('🧠 智能统计分析', 50, currentY);
-            currentY += 40;
-
-            this.drawIntelligentStatsOnCanvas(ctx, stats, currentY);
-            currentY += 250;
-        }
-
-        // 绘制相对分析表格
-        if (includeRelativeAnalysis && this.lapData.length > 0) {
-            ctx.fillStyle = '#37474f';
-            ctx.font = 'bold 24px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText('📈 相对分析表格', 50, currentY);
-            currentY += 40;
-
-            this.drawRelativeAnalysisOnCanvas(ctx, currentY);
-        }
-
-        // 导出图片
-        const link = document.createElement('a');
+    // 获取导出信息
+    getExportInfo(includeChart, includeIntelligentStats, includeRelativeAnalysis) {
         const exportTypes = [];
         if (includeChart) exportTypes.push('chart');
         if (includeIntelligentStats) exportTypes.push('stats');
         if (includeRelativeAnalysis) exportTypes.push('analysis');
 
-        const filename = `speed_monitor_${exportTypes.join('_')}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
-        link.download = filename;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
+        let canvasHeight = 200; // 基础高度
+        if (includeChart) canvasHeight += 450;
+        if (includeIntelligentStats) canvasHeight += 300;
+        if (includeRelativeAnalysis) canvasHeight += Math.min(400, this.lapData.length * 25 + 100);
 
-        this.addDebugLog(`报告已导出为: ${filename}`);
+        return {
+            types: exportTypes,
+            filename: `speed_monitor_${exportTypes.join('_')}_${new Date().toISOString().slice(0, 16).replace(/[:.]/g, '-')}.png`,
+            height: canvasHeight
+        };
     }
 
-    // 在canvas上绘制智能统计
-    drawIntelligentStatsOnCanvas(ctx, stats, startY) {
-        const leftCol = 80;
-        const rightCol = 600;
+    // 创建导出canvas
+    createExportCanvas(exportInfo) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
 
+        canvas.width = 1200;
+        canvas.height = exportInfo.height;
+
+        // 设置高质量渲染
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // 设置白色背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        return canvas;
+    }
+
+    // 带图表的导出
+    exportWithChart(canvas, stats, includeIntelligentStats, includeRelativeAnalysis, exportInfo) {
+        const ctx = canvas.getContext('2d');
+
+        // 绘制标题和基础信息
+        let currentY = this.drawExportHeader(ctx, exportInfo);
+
+        // 获取图表图像
+        const chartCanvas = this.chart.canvas;
+        const chartImage = new Image();
+
+        chartImage.onload = () => {
+            // 绘制图表
+            ctx.drawImage(chartImage, 50, currentY, 1100, 400);
+            currentY += 450;
+
+            // 继续绘制其他内容
+            this.finishExport(ctx, canvas, stats, includeIntelligentStats, includeRelativeAnalysis, currentY, exportInfo);
+        };
+
+        chartImage.onerror = () => {
+            this.addDebugLog('图表加载失败，跳过图表导出', 'error');
+            this.finishExport(ctx, canvas, stats, includeIntelligentStats, includeRelativeAnalysis, currentY, exportInfo);
+        };
+
+        chartImage.src = chartCanvas.toDataURL('image/png', 1.0);
+    }
+
+    // 无图表的导出
+    exportWithoutChart(canvas, stats, includeIntelligentStats, includeRelativeAnalysis, exportInfo) {
+        const ctx = canvas.getContext('2d');
+        const currentY = this.drawExportHeader(ctx, exportInfo);
+        this.finishExport(ctx, canvas, stats, includeIntelligentStats, includeRelativeAnalysis, currentY, exportInfo);
+    }
+
+    // 绘制导出标题
+    drawExportHeader(ctx, exportInfo) {
+        const timestamp = new Date().toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        // 主标题
         ctx.fillStyle = '#37474f';
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'left';
+        ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🏎️ 速度监测系统 - 数据分析报告', 600, 40);
 
-        let y = startY;
+        // 时间戳
+        ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+        ctx.fillText(`导出时间: ${timestamp}`, 600, 70);
+
+        // 数据摘要
+        ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+        ctx.fillText(`数据范围: 共${this.lapData.length}圈 | 导出内容: ${this.getExportTypeNames(exportInfo.types).join(' + ')}`, 600, 100);
+
+        // 分割线
+        ctx.strokeStyle = '#e0f2f1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(50, 120);
+        ctx.lineTo(1150, 120);
+        ctx.stroke();
+
+        return 140;
+    }
+
+    // 获取导出类型名称
+    getExportTypeNames(types) {
+        const nameMap = {
+            chart: '图表',
+            stats: '智能统计',
+            analysis: '相对分析'
+        };
+        return types.map(type => nameMap[type] || type);
+    }
+
+    // 完成导出
+    finishExport(ctx, canvas, stats, includeIntelligentStats, includeRelativeAnalysis, startY, exportInfo) {
+        let currentY = startY;
+
+        // 绘制智能统计
+        if (includeIntelligentStats) {
+            currentY = this.drawIntelligentStatsSection(ctx, stats, currentY);
+        }
+
+        // 绘制相对分析表格
+        if (includeRelativeAnalysis && this.lapData.length > 0) {
+            currentY = this.drawRelativeAnalysisSection(ctx, currentY);
+        }
+
+        // 添加页脚
+        this.drawExportFooter(ctx, canvas.height);
+
+        // 导出文件
+        this.downloadCanvas(canvas, exportInfo.filename);
+
+        this.addDebugLog(`报告已成功导出: ${exportInfo.filename}`);
+        this.showNotification(`报告已导出为: ${exportInfo.filename}`, 'success');
+    }
+
+    // 绘制智能统计部分
+    drawIntelligentStatsSection(ctx, stats, startY) {
+        ctx.fillStyle = '#37474f';
+        ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('🧠 智能统计分析', 50, startY);
+
+        // 背景框
+        ctx.fillStyle = 'rgba(255, 112, 67, 0.1)';
+        ctx.fillRect(50, startY + 10, 1100, 200);
+
+        // 统计数据
+        ctx.fillStyle = '#37474f';
+        ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+
+        const leftCol = 80;
+        const rightCol = 620;
+        let y = startY + 50;
 
         // 左列
-        ctx.fillText(`圈数范围: ${stats.lapRange}`, leftCol, y);
-        y += 25;
-        ctx.fillText(`总用时: ${stats.totalTime}`, leftCol, y);
-        y += 25;
-        ctx.fillText(`平均每圈: ${stats.averageTime}`, leftCol, y);
-        y += 25;
-        ctx.fillText(`平均速度: ${stats.averageSpeed}`, leftCol, y);
-        y += 25;
-        ctx.fillText(`最快速度: ${stats.maxSpeed}`, leftCol, y);
+        const leftStats = [
+            `📊 数据范围: ${stats.lapRange}`,
+            `⏱️ 总用时: ${stats.totalTime}`,
+            `📈 平均每圈: ${stats.averageTime}`,
+            `🏎️ 平均速度: ${stats.averageSpeed}`,
+            `⚡ 最快速度: ${stats.maxSpeed}`
+        ];
+
+        leftStats.forEach(stat => {
+            ctx.fillText(stat, leftCol, y);
+            y += 30;
+        });
 
         // 右列
-        y = startY;
-        ctx.fillText(`最快单圈: ${stats.fastestLap}`, rightCol, y);
-        y += 25;
-        ctx.fillText(`最慢单圈: ${stats.slowestLap}`, rightCol, y);
-        y += 25;
-        ctx.fillText(`时间差值: ${stats.timeDifference}`, rightCol, y);
-        y += 25;
-        ctx.fillText(`最快组合: ${stats.fastestCombo}`, rightCol, y);
-        y += 25;
-        ctx.fillText(`组合范围: ${stats.fastestComboRange}`, rightCol, y);
+        y = startY + 50;
+        const rightStats = [
+            `🏆 最快单圈: ${stats.fastestLap}`,
+            `🐌 最慢单圈: ${stats.slowestLap}`,
+            `📏 时间差值: ${stats.timeDifference}`,
+            `🔥 最快组合: ${stats.fastestCombo}`,
+            `📍 组合范围: ${stats.fastestComboRange}`
+        ];
+
+        rightStats.forEach(stat => {
+            ctx.fillText(stat, rightCol, y);
+            y += 30;
+        });
+
+        return startY + 240;
     }
 
-    // 在canvas上绘制相对分析表格
-    drawRelativeAnalysisOnCanvas(ctx, startY) {
+    // 绘制相对分析部分
+    drawRelativeAnalysisSection(ctx, startY) {
+        ctx.fillStyle = '#37474f';
+        ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('📈 相对分析表格', 50, startY);
+
         const times = this.lapData.map(lap => lap.time);
         const fastestTime = Math.min(...times);
 
-        ctx.fillStyle = '#37474f';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
+        // 表格设置
+        const tableStartY = startY + 40;
+        const rowHeight = 25;
+        const colWidths = [150, 150, 150, 200, 150];
+        const colStartX = [50, 200, 350, 500, 700];
 
         // 表头
-        const colWidth = 200;
-        const cols = ['圈数', '圈速 (s)', '速度 (m/s)', '相对最快圈 (s)', '百分比差值'];
-
-        let y = startY;
-
-        // 绘制表头背景
         ctx.fillStyle = 'rgba(79, 195, 247, 0.2)';
-        ctx.fillRect(50, y - 20, 1100, 30);
+        ctx.fillRect(50, tableStartY - 5, 800, rowHeight);
 
         ctx.fillStyle = '#37474f';
-        ctx.font = 'bold 14px Arial';
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+        ctx.textAlign = 'center';
 
-        for (let i = 0; i < cols.length; i++) {
-            ctx.fillText(cols[i], 50 + i * colWidth + colWidth / 2, y);
-        }
+        const headers = ['圈数', '圈速 (s)', '速度 (m/s)', '相对最快圈 (s)', '百分比差值'];
+        headers.forEach((header, i) => {
+            ctx.fillText(header, colStartX[i] + colWidths[i] / 2, tableStartY + 15);
+        });
 
-        y += 30;
+        // 数据行
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+        let currentRowY = tableStartY + rowHeight + 5;
 
-        // 绘制数据行
-        ctx.font = '12px Arial';
-        this.lapData.forEach((lap, index) => {
+        // 限制显示行数
+        const maxRows = Math.min(this.lapData.length, 12);
+        const displayData = this.lapData.slice(0, maxRows);
+
+        displayData.forEach((lap, index) => {
             const timeDiff = lap.time - fastestTime;
             const percentDiff = ((lap.time - fastestTime) / fastestTime * 100);
             const isFastest = lap.time === fastestTime;
@@ -477,7 +679,7 @@ class SpeedMonitorApp {
             // 最快圈高亮
             if (isFastest) {
                 ctx.fillStyle = 'rgba(77, 182, 172, 0.3)';
-                ctx.fillRect(50, y - 15, 1100, 20);
+                ctx.fillRect(50, currentRowY - 15, 800, rowHeight);
             }
 
             ctx.fillStyle = '#37474f';
@@ -490,16 +692,132 @@ class SpeedMonitorApp {
                 isFastest ? '0.0%' : '+' + percentDiff.toFixed(1) + '%'
             ];
 
-            for (let i = 0; i < rowData.length; i++) {
-                ctx.fillText(rowData[i], 50 + i * colWidth + colWidth / 2, y);
-            }
+            rowData.forEach((data, i) => {
+                ctx.fillText(data, colStartX[i] + colWidths[i] / 2, currentRowY + 5);
+            });
 
-            y += 20;
+            currentRowY += rowHeight;
         });
+
+        // 如果数据被截断，显示提示
+        if (this.lapData.length > maxRows) {
+            ctx.fillStyle = '#ff7043';
+            ctx.font = 'italic 12px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`显示前${maxRows}圈数据，共${this.lapData.length}圈`, 450, currentRowY + 20);
+            currentRowY += 40;
+        }
+
+        return currentRowY + 20;
     }
 
-    // 导出图表为PNG图片（保留原有功能）
+    // 绘制页脚
+    drawExportFooter(ctx, canvasHeight) {
+        const footerY = canvasHeight - 40;
+
+        // 分割线
+        ctx.strokeStyle = '#e0f2f1';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(50, footerY - 20);
+        ctx.lineTo(1150, footerY - 20);
+        ctx.stroke();
+
+        // 页脚文本
+        ctx.fillStyle = '#78909c';
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Generated by 速度监测系统 v2.1.0 | Powered by G2-13 Dong Zhicheng & G1-12 Tan Xinmin', 600, footerY);
+    }
+
+    // 下载canvas
+    downloadCanvas(canvas, filename) {
+        try {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png', 1.0);
+
+            // 触发下载
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            this.addDebugLog(`文件下载已触发: ${filename}`);
+        } catch (error) {
+            this.addDebugLog(`下载失败: ${error.message}`, 'error');
+            this.showNotification('下载失败，请检查浏览器权限', 'error');
+        }
+    }
+
+    // 显示通知
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span class="notification-icon">${this.getNotificationIcon(type)}</span>
+                <span class="notification-message">${message}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+
+        // 添加样式
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${this.getNotificationColor(type)};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            z-index: 10000;
+            max-width: 400px;
+            animation: slideInRight 0.3s ease;
+        `;
+
+        document.body.appendChild(notification);
+
+        // 自动移除
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }
+        }, type === 'error' ? 5000 : 3000);
+    }
+
+    // 获取通知图标
+    getNotificationIcon(type) {
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+        return icons[type] || icons.info;
+    }
+
+    // 获取通知颜色
+    getNotificationColor(type) {
+        const colors = {
+            success: 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)',
+            error: 'linear-gradient(135deg, #f44336 0%, #da190b 100%)',
+            warning: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+            info: 'linear-gradient(135deg, #2196f3 0%, #0d8bf2 100%)'
+        };
+        return colors[type] || colors.info;
+    }
+
+    // 快速导出图表（保留原有功能的简化版本）
     exportChartImage() {
+        if (this.lapData.length === 0) {
+            this.showNotification('暂无数据可导出！', 'warning');
+            return;
+        }
+
         this.exportSelectedContent(true, false, false);
     }
 

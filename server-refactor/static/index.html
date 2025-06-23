@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>速度监测系统</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="app.js"></script>
-    <link rel="stylesheet" href="styles.css">
+    <script src="/static/app.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
@@ -22,7 +22,7 @@
                     ⏸️ 停止检测
                 </button>
                 <button id="exportChartButton" class="control-button export">
-                    📊 导出图表
+                    📊 导出数据
                 </button>
             </div>
             <button class="settings-button" id="settingsButton">⚙️</button>
@@ -215,7 +215,7 @@
                         </tr>
                     </thead>
                     <tbody id="relativeAnalysisTableBody">
-                        <!-- 数据将由JavaScript填充 -->
+                        <tr><td colspan="5">暂无数据</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -225,7 +225,7 @@
         <div class="chart-container">
             <div class="chart-title">速度变化趋势</div>
             <div class="chart-controls">
-                <button class="chart-control-btn" id="exportPngButton">📷 导出PNG</button>
+                <button class="chart-control-btn" id="exportPngButton">📷 快速导出</button>
             </div>
             <canvas id="velocityChart"></canvas>
         </div>
@@ -265,11 +265,12 @@
 
             <div class="footer-section">
                 <h3>📊 新增功能</h3>
-                <p>• 图表导出PNG功能</p>
-                <p>• 智能统计分析</p>
+                <p>• 智能导出选择</p>
+                <p>• 导出进度提示</p>
                 <p>• 连续N圈最快组合</p>
                 <p>• 相对分析表格</p>
                 <p>• 综合数据统计</p>
+                <p>• 用户体验优化</p>
             </div>
 
             <div class="footer-section">
@@ -277,7 +278,7 @@
                 <p>1. 点击"启动检测"开始监测</p>
                 <p>2. 通过设置调整参数</p>
                 <p>3. 查看实时数据和统计</p>
-                <p>4. 导出图表进行分析</p>
+                <p>4. 智能选择导出内容</p>
                 <p><a href="#" id="openSettingsLink">⚙️ 打开系统设置</a></p>
             </div>
         </div>
