@@ -1265,8 +1265,10 @@ class SpeedMonitorApp {
         }
     }
 
-    updateRecentLapsDetails(recentLaps, lapCount) {
-        const recentLapsDetails = this.elements.recentLapsDetails;
+    // 在 SpeedMonitorApp 类中替换 updateRecentLapsDetails 方法
+
+updateRecentLapsDetails(recentLaps, lapCount) {
+    const recentLapsDetails = this.elements.recentLapsDetails;
 
         if (!recentLaps.laps || recentLaps.total === 0 || this.lapData.length === 0) {
             recentLapsDetails.innerHTML = '<div class="recent-lap-item">暂无数据</div>';
@@ -1288,7 +1290,7 @@ class SpeedMonitorApp {
             }
         }
 
-        // 计算平均速度
+        // 获取当前圈数范围的数据
         const recentLapsData = [];
         for (let lapNum = startLap; lapNum <= endLap; lapNum++) {
             const lapInfo = this.lapData.find(lap => lap.lap === lapNum);
@@ -1297,43 +1299,80 @@ class SpeedMonitorApp {
             }
         }
 
+        // 计算统计数据
         const averageTime = recentLaps.total / lapCount;
         const averageSpeed = recentLapsData.length > 0 ?
             recentLapsData.reduce((sum, lap) => sum + lap.speed, 0) / recentLapsData.length : 0;
 
-        // 构建详细信息HTML
+        // 构建显示HTML - 重点显示总时间和平均数据
         let detailsHTML = '';
 
-        // 添加统计信息
+        // 添加圈数范围信息
         detailsHTML += `
             <div class="recent-lap-item" style="background: linear-gradient(135deg, #81c784 0%, #66bb6a 100%); color: white; font-weight: 600;">
-                圈数范围: ${recentLaps.laps}
+                🏁 圈数范围: ${recentLaps.laps}
             </div>
-            <div class="recent-lap-item" style="background: linear-gradient(135deg, #4db6ac 0%, #26a69a 100%); color: white; font-weight: 600;">
-                总时间: ${recentLaps.total}s | 平均: ${averageTime.toFixed(3)}s
-            </div>
-            <div class="recent-lap-item recent-lap-best">
-                平均速度: ${averageSpeed.toFixed(2)}m/s
-            </div>
-            <div style="height: 1px; background: #e0f2f1; margin: 8px 0;"></div>
         `;
 
-        // 添加每圈详细时间和速度
-        for (let lapNum = startLap; lapNum <= endLap; lapNum++) {
-            const lapInfo = this.lapData.find(lap => lap.lap === lapNum);
-            if (lapInfo) {
-                // 判断是否是最快的一圈
-                const recentLapTimes = [];
-                for (let i = startLap; i <= endLap; i++) {
-                    const lap = this.lapData.find(l => l.lap === i);
-                    if (lap) recentLapTimes.push(lap.time);
-                }
-                const isFastest = recentLapTimes.length > 1 && lapInfo.time === Math.min(...recentLapTimes);
+        // 添加总时间信息
+        detailsHTML += `
+            <div class="recent-lap-item" style="background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%); color: white; font-weight: 600;">
+                ⏱️ 总时间: ${recentLaps.total.toFixed(3)}s
+            </div>
+        `;
 
+        // 添加平均时间信息
+        detailsHTML += `
+            <div class="recent-lap-item" style="background: linear-gradient(135deg, #4db6ac 0%, #26a69a 100%); color: white; font-weight: 600;">
+                📊 平均: ${averageTime.toFixed(3)}s
+            </div>
+        `;
+
+        // 添加平均速度信息
+        detailsHTML += `
+            <div class="recent-lap-item recent-lap-best">
+                🏎️ 平均速度: ${averageSpeed.toFixed(2)}m/s
+            </div>
+        `;
+
+        // 如果有多圈数据，添加分组显示
+        if (recentLapsData.length > 1) {
+            // 添加分割线
+            detailsHTML += `
+                <div style="height: 1px; background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%); margin: 10px 0;"></div>
+            `;
+
+            // 计算每N圈的组合（如果数据足够的话）
+            const groupSize = Math.min(lapCount, recentLapsData.length);
+
+            // 按组显示数据
+            for (let i = 0; i < recentLapsData.length; i += groupSize) {
+                const group = recentLapsData.slice(i, Math.min(i + groupSize, recentLapsData.length));
+
+                if (group.length === groupSize) {
+                    const groupTotalTime = group.reduce((sum, lap) => sum + lap.time, 0);
+                    const groupAvgSpeed = group.reduce((sum, lap) => sum + lap.speed, 0) / group.length;
+                    const groupStartLap = group[0].lap;
+                    const groupEndLap = group[group.length - 1].lap;
+
+                    const isCurrentGroup = groupStartLap === startLap && groupEndLap === endLap;
+
+                    detailsHTML += `
+                        <div class="recent-lap-item ${isCurrentGroup ? 'recent-lap-best' : ''}"
+                             style="${isCurrentGroup ? '' : 'background: #f1f8e9; border-left: 4px solid #81c784;'}">
+                            第${groupStartLap}${groupSize > 1 ? `-${groupEndLap}` : ''}圈: ${groupTotalTime.toFixed(3)}s | ${groupAvgSpeed.toFixed(2)}m/s ${isCurrentGroup ? '🏆' : ''}
+                        </div>
+                    `;
+                }
+            }
+        } else {
+            // 如果只有单圈数据，显示单圈信息
+            if (recentLapsData.length === 1) {
+                const singleLap = recentLapsData[0];
                 detailsHTML += `
-                    <div class="recent-lap-item ${isFastest ? 'recent-lap-best' : ''}"
-                         style="${isFastest ? '' : 'background: #f1f8e9; border-left: 4px solid #81c784;'}">
-                        第${lapNum}圈: ${lapInfo.time}s | ${lapInfo.speed}m/s ${isFastest ? '🏆' : ''}
+                    <div style="height: 1px; background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%); margin: 10px 0;"></div>
+                    <div class="recent-lap-item recent-lap-best">
+                        第${singleLap.lap}圈详情: ${singleLap.time.toFixed(3)}s | ${singleLap.speed.toFixed(2)}m/s 🏆
                     </div>
                 `;
             }
